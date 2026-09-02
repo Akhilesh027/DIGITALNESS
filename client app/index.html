@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ServicePro - Service Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #6c757d;
+            --success: #28a745;
+            --info: #17a2b8;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --light: #f8f9fa;
+            --dark: #343a40;
+            --sidebar-width: 250px;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f7fb;
+            overflow-x: hidden;
+        }
+        
+        #sidebar {
+            position: fixed;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: linear-gradient(to bottom, var(--primary), #3a56d4);
+            color: white;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        
+        #sidebar .sidebar-header {
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        #sidebar ul li a {
+            padding: 15px 25px;
+            display: block;
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        #sidebar ul li a:hover {
+            color: white;
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        #sidebar ul li a.active {
+            background: rgba(0, 0, 0, 0.2);
+            color: white;
+        }
+        
+        #sidebar ul li a i {
+            margin-right: 10px;
+        }
+        
+        #content {
+            width: calc(100% - var(--sidebar-width));
+            margin-left: var(--sidebar-width);
+            min-height: 100vh;
+            transition: all 0.3s;
+        }
+        
+        .navbar {
+            background-color: white;
+            box-shadow: 0 0.125rem 0.625rem rgba(90, 97, 105, 0.1);
+        }
+        
+        .card {
+            border: none;
+            border-radius: 0.5rem;
+            box-shadow: 0 0.125rem 0.625rem rgba(90, 97, 105, 0.1);
+            margin-bottom: 1.5rem;
+        }
+        
+        .card-header {
+            background-color: white;
+            border-bottom: 1px solid #e1e5eb;
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        .btn-primary:hover {
+            background-color: #3a56d4;
+            border-color: #3a56d4;
+        }
+        
+        .service-category {
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .category-home {
+            background-color: rgba(67, 97, 238, 0.15);
+            color: var(--primary);
+        }
+        
+        .category-salon {
+            background-color: rgba(247, 37, 133, 0.15);
+            color: #f72585;
+        }
+        
+        .category-wellness {
+            background-color: rgba(114, 9, 183, 0.15);
+            color: #7209b7;
+        }
+        
+        .category-other {
+            background-color: rgba(76, 201, 240, 0.15);
+            color: #4cc9f0;
+        }
+        
+        .table th {
+            font-weight: 600;
+            color: var(--secondary);
+        }
+        
+        .status-badge {
+            padding: 0.35rem 0.65rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background-color: rgba(40, 167, 69, 0.15);
+            color: #28a745;
+        }
+        
+        .status-inactive {
+            background-color: rgba(108, 117, 125, 0.15);
+            color: #6c757d;
+        }
+        
+        .modal-header {
+            border-bottom: 1px solid #e1e5eb;
+        }
+        
+        .modal-footer {
+            border-top: 1px solid #e1e5eb;
+        }
+        
+        @media (max-width: 768px) {
+            #sidebar {
+                margin-left: -var(--sidebar-width);
+            }
+            
+            #content {
+                width: 100%;
+                margin-left: 0;
+            }
+            
+            #sidebar.active {
+                margin-left: 0;
+            }
+            
+            #content.active {
+                width: calc(100% - var(--sidebar-width));
+                margin-left: var(--sidebar-width);
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav id="sidebar">
+        <div class="sidebar-header">
+            <h3>ServicePro</h3>
+            <p class="mb-0">Admin Dashboard</p>
+        </div>
+
+        <ul class="list-unstyled">
+            <li><a href="#"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+            <li><a href="#"><i class="bi bi-people"></i> User Management</a></li>
+            <li><a href="#" class="active"><i class="bi bi-briefcase"></i> Service Management</a></li>
+            <li><a href="#"><i class="bi bi-calendar-event"></i> Booking Management</a></li>
+            <li><a href="#"><i class="bi bi-cart"></i> Product Management</a></li>
+            <li><a href="#"><i class="bi bi-file-earmark-text"></i> Content Management</a></li>
+            <li><a href="#"><i class="bi bi-graph-up"></i> Finance & Reports</a></li>
+            <li><a href="#"><i class="bi bi-gear"></i> Settings</a></li>
+        </ul>
+    </nav>
+
+    <!-- Page Content -->
+    <div id="content">
+        <!-- Top Navigation -->
+        <nav class="navbar navbar-expand-lg navbar-light">
+            <div class="container-fluid">
+                <button id="sidebarCollapse" class="btn btn-primary">
+                    <i class="bi bi-list"></i>
+                </button>
+                
+                <div class="d-flex align-items-center">
+                    <div class="dropdown ms-3">
+                        <a href="#" class="dropdown-toggle text-dark text-decoration-none" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <img src="https://via.placeholder.com/40" class="rounded-circle me-2" alt="Admin">
+                            Admin User
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-person me-2"></i> Profile</a></li>
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-gear me-2"></i> Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#"><i class="bi bi-box-arrow-right me-2"></i> Logout</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="container-fluid">
+            <!-- Service Management Section -->
+            <section id="service-management">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2>Service Management</h2>
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addServiceModal">
+                        <i class="bi bi-plus-circle me-2"></i>Add New Service
+                    </button>
+                </div>
+
+                <!-- Filters and Search -->
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="input-group mb-3">
+                                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                                    <input type="text" class="form-control" placeholder="Search services...">
+                                    <button class="btn btn-outline-secondary" type="button">Search</button>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex">
+                                    <select class="form-select me-2">
+                                        <option selected>All Categories</option>
+                                        <option>Home Services</option>
+                                        <option>Salon & Beauty</option>
+                                        <option>Wellness</option>
+                                        <option>Other</option>
+                                    </select>
+                                    <select class="form-select">
+                                        <option selected>All Status</option>
+                                        <option>Active</option>
+                                        <option>Inactive</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Services Table -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>All Services</span>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary me-2">
+                                <i class="bi bi-filter me-1"></i>Filter
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-download me-1"></i>Export
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="">
+                                            </div>
+                                        </th>
+                                        <th>Service Name</th>
+                                        <th>Category</th>
+                                        <th>Price</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Bookings</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <img src="https://via.placeholder.com/40" class="rounded me-3" alt="Service">
+                                                <div>
+                                                    <h6 class="mb-0">Deep Cleaning</h6>
+                                                    <small class="text-muted">ID: SVC-001</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><span class="service-category category-home">Home Services</span></td>
+                                        <td>$89.99</td>
+                                        <td>3 hours</td>
+                                        <td><span class="status-badge status-active">Active</span></td>
+                                        <td>324</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editServiceModal">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <img src="https://via.placeholder.com/40" class="rounded me-3" alt="Service">
+                                                <div>
+                                                    <h6 class="mb-0">Haircut & Styling</h6>
+                                                    <small class="text-muted">ID: SVC-002</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><span class="service-category category-salon">Salon & Beauty</span></td>
+                                        <td>$45.00</td>
+                                        <td>1 hour</td>
+                                        <td><span class="status-badge status-active">Active</span></td>
+                                        <td>298</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <img src="https://via.placeholder.com/40" class="rounded me-3" alt="Service">
+                                                <div>
+                                                    <h6 class="mb-0">Plumbing Repair</h6>
+                                                    <small class="text-muted">ID: SVC-003</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><span class="service-category category-home">Home Services</span></td>
+                                        <td>$79.99</td>
+                                        <td>2 hours</td>
+                                        <td><span class="status-badge status-active">Active</span></td>
+                                        <td>267</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <img src="https://via.placeholder.com/40" class="rounded me-3" alt="Service">
+                                                <div>
+                                                    <h6 class="mb-0">Therapeutic Massage</h6>
+                                                    <small class="text-muted">ID: SVC-004</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><span class="service-category category-wellness">Wellness</span></td>
+                                        <td>$75.00</td>
+                                        <td>1.5 hours</td>
+                                        <td><span class="status-badge status-active">Active</span></td>
+                                        <td>231</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" value="">
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <img src="https://via.placeholder.com/40" class="rounded me-3" alt="Service">
+                                                <div>
+                                                    <h6 class="mb-0">Electrical Installation</h6>
+                                                    <small class="text-muted">ID: SVC-005</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td><span class="service-category category-home">Home Services</span></td>
+                                        <td>$99.99</td>
+                                        <td>2.5 hours</td>
+                                        <td><span class="status-badge status-inactive">Inactive</span></td>
+                                        <td>215</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                <button class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Pagination -->
+                        <nav aria-label="Page navigation">
+                            <ul class="pagination justify-content-center">
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" tabindex="-1">Previous</a>
+                                </li>
+                                <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                                <li class="page-item"><a class="page-link" href="#">2</a></li>
+                                <li class="page-item"><a class="page-link" href="#">3</a></li>
+                                <li class="page-item">
+                                    <a class="page-link" href="#">Next</a>
+                                </li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Add Service Modal -->
+    <div class="modal fade" id="addServiceModal" tabindex="-1" aria-labelledby="addServiceModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addServiceModalLabel">Add New Service</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="serviceName" class="form-label">Service Name</label>
+                                <input type="text" class="form-control" id="serviceName" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="serviceCategory" class="form-label">Category</label>
+                                <select class="form-select" id="serviceCategory" required>
+                                    <option value="">Select Category</option>
+                                    <option value="home">Home Services</option>
+                                    <option value="salon">Salon & Beauty</option>
+                                    <option value="wellness">Wellness</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="serviceDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="serviceDescription" rows="3" required></textarea>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="servicePrice" class="form-label">Price ($)</label>
+                                <input type="number" class="form-control" id="servicePrice" min="0" step="0.01" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="serviceDuration" class="form-label">Duration</label>
+                                <select class="form-select" id="serviceDuration" required>
+                                    <option value="">Select Duration</option>
+                                    <option value="30">30 minutes</option>
+                                    <option value="60">1 hour</option>
+                                    <option value="90">1.5 hours</option>
+                                    <option value="120">2 hours</option>
+                                    <option value="180">3 hours</option>
+                                    <option value="240">4 hours</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="serviceStatus" class="form-label">Status</label>
+                                <select class="form-select" id="serviceStatus" required>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="serviceImage" class="form-label">Service Image</label>
+                            <input class="form-control" type="file" id="serviceImage">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary">Add Service</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Service Modal -->
+    <div class="modal fade" id="editServiceModal" tabindex="-1" aria-labelledby="editServiceModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editServiceModalLabel">Edit Service</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editServiceName" class="form-label">Service Name</label>
+                                <input type="text" class="form-control" id="editServiceName" value="Deep Cleaning" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editServiceCategory" class="form-label">Category</label>
+                                <select class="form-select" id="editServiceCategory" required>
+                                    <option value="home" selected>Home Services</option>
+                                    <option value="salon">Salon & Beauty</option>
+                                    <option value="wellness">Wellness</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="editServiceDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="editServiceDescription" rows="3" required>Professional deep cleaning service for homes and apartments. Our team will thoroughly clean every corner of your space.</textarea>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="editServicePrice" class="form-label">Price ($)</label>
+                                <input type="number" class="form-control" id="editServicePrice" value="89.99" min="0" step="0.01" required>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="editServiceDuration" class="form-label">Duration</label>
+                                <select class="form-select" id="editServiceDuration" required>
+                                    <option value="30">30 minutes</option>
+                                    <option value="60">1 hour</option>
+                                    <option value="90">1.5 hours</option>
+                                    <option value="120">2 hours</option>
+                                    <option value="180" selected>3 hours</option>
+                                    <option value="240">4 hours</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="editServiceStatus" class="form-label">Status</label>
+                                <select class="form-select" id="editServiceStatus" required>
+                                    <option value="active" selected>Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="editServiceImage" class="form-label">Service Image</label>
+                            <input class="form-control" type="file" id="editServiceImage">
+                            <div class="form-text">Current image: cleaning-service.jpg</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Toggle sidebar
+        document.getElementById('sidebarCollapse').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.toggle('active');
+            document.getElementById('content').classList.toggle('active');
+        });
+
+        // Service management functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Sample service data (in a real app, this would come from an API)
+            const services = [
+                {
+                    id: 'SVC-001',
+                    name: 'Deep Cleaning',
+                    category: 'home',
+                    price: 89.99,
+                    duration: '3 hours',
+                    status: 'active',
+                    bookings: 324,
+                    image: 'https://via.placeholder.com/40'
+                },
+                {
+                    id: 'SVC-002',
+                    name: 'Haircut & Styling',
+                    category: 'salon',
+                    price: 45.00,
+                    duration: '1 hour',
+                    status: 'active',
+                    bookings: 298,
+                    image: 'https://via.placeholder.com/40'
+                },
+                // More services would be here...
+            ];
+
+            // Function to populate the services table
+            function populateServicesTable() {
+                // In a real application, this would dynamically generate the table rows
+                console.log('Services loaded:', services.length);
+            }
+
+            // Initialize the page
+            populateServicesTable();
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,182 @@
+[
+  {
+    "title": "Roll On Wax",
+    "img": "https://images.unsplash.com/photo-1606813907291-4d734c1f06f1",
+    "price": "₹849",
+    "oldPrice": "₹1299",
+    "discount": "35%",
+    "rating": "4.71 (108,339 ratings)",
+    "overview": ["Waxing Kit", "Less Heat", "Disposable Kit", "Mess-Free"],
+    "thingsToKnow": [
+      "AC is highly recommended for waxing.",
+      "Areas with wounds & cuts won’t be waxed.",
+      "No previous history of major reaction due to wax.",
+      "Hair should be at least 0.25 inch in length.",
+      "If using own product, kindly uncheck product cost."
+    ],
+    "procedure": [
+      {
+        "title": "Pre-Wax Preparation",
+        "desc": "Wax station set-up followed by pre-wax gel application.",
+        "img": "https://images.unsplash.com/photo-1606813907291-4d734c1f06f1"
+      }
+    ],
+    "precautions": [
+      "Moisturise your skin with a soothing moisturiser.",
+      "Do not use harsh products on waxed skin.",
+      "Avoid direct sun/ hot showers for a few hours.",
+      "Wear loose cotton clothes after waxing.",
+      "Avoid exercising for a few hours after waxing."
+    ],
+    "faqs": [
+      "Why waxing better than shaving?",
+      "How is roll on wax better than tin wax?",
+      "Is it important to apply moisturiser after waxing?",
+      "How often should I get waxed?",
+      "Why AC is mandatory while waxing?",
+      "Do I need to provide anything for the service?",
+      "How do I prepare my skin for waxing?",
+      "What if there is redness after waxing?"
+    ]
+  },
+  {
+    "title": "Aloe Vera Gel",
+    "img": "https://images.unsplash.com/photo-1617042375875-9fdb0b4e1c03",
+    "price": "₹499",
+    "oldPrice": "₹799",
+    "discount": "40%",
+    "rating": "4.85 (78,210 ratings)",
+    "overview": ["Soothing Gel", "Hydrating", "Cooling Effect", "Organic"],
+    "thingsToKnow": [
+      "Best applied after waxing or shaving.",
+      "Store in a cool place, preferably refrigerated.",
+      "Suitable for all skin types.",
+      "Avoid contact with eyes."
+    ],
+    "procedure": [
+      {
+        "title": "Application",
+        "desc": "Apply a thin layer of gel directly on skin and massage until absorbed.",
+        "img": "https://images.unsplash.com/photo-1617042375875-9fdb0b4e1c03"
+      }
+    ],
+    "precautions": [
+      "Do not use on open wounds.",
+      "Test on a small patch before use.",
+      "Avoid mixing with strong acids or exfoliants.",
+      "Use within 6 months of opening."
+    ],
+    "faqs": [
+      "Can aloe vera reduce redness?",
+      "Is it safe for acne-prone skin?",
+      "How often can I use it?",
+      "Does it help with sunburns?",
+      "Can it be used as a moisturiser?"
+    ]
+  },
+  {
+    "title": "Facial Steamer",
+    "img": "https://images.unsplash.com/photo-1607330288980-68e35c2c1d79",
+    "price": "₹1,299",
+    "oldPrice": "₹1,999",
+    "discount": "35%",
+    "rating": "4.68 (56,102 ratings)",
+    "overview": ["Opens Pores", "Deep Cleansing", "Hydrating Steam", "Portable"],
+    "thingsToKnow": [
+      "Use only distilled or purified water.",
+      "Recommended for 10-15 mins per session.",
+      "Avoid use if you have active skin infections.",
+      "Do not add essential oils directly."
+    ],
+    "procedure": [
+      {
+        "title": "Steam Treatment",
+        "desc": "Fill with water, switch on, and let the steam relax and cleanse your skin.",
+        "img": "https://images.unsplash.com/photo-1607330288980-68e35c2c1d79"
+      }
+    ],
+    "precautions": [
+      "Keep device at least 20cm away from face.",
+      "Do not use more than twice a week.",
+      "Avoid use with open cuts.",
+      "Switch off immediately after use."
+    ],
+    "faqs": [
+      "Is steaming good for acne?",
+      "Can I add essential oils?",
+      "How often should I steam?",
+      "Does it help with blackheads?",
+      "Can it be used daily?"
+    ]
+  },
+  {
+    "title": "Hair Spa Cream",
+    "img": "https://images.unsplash.com/photo-1589923188900-9d6e6f41a4b3",
+    "price": "₹699",
+    "oldPrice": "₹1,199",
+    "discount": "42%",
+    "rating": "4.80 (43,870 ratings)",
+    "overview": ["Deep Nourishment", "Frizz Control", "Smooth Finish", "Salon-like Spa"],
+    "thingsToKnow": [
+      "Apply on damp hair after shampoo.",
+      "Use once a week for best results.",
+      "Avoid scalp if oily.",
+      "Rinse thoroughly with lukewarm water."
+    ],
+    "procedure": [
+      {
+        "title": "Hair Spa Process",
+        "desc": "Massage into hair strands, leave for 15 minutes, rinse for silky smooth finish.",
+        "img": "https://images.unsplash.com/photo-1589923188900-9d6e6f41a4b3"
+      }
+    ],
+    "precautions": [
+      "Avoid contact with eyes.",
+      "Do not use on scalp wounds.",
+      "Patch test before full use.",
+      "Not recommended for daily use."
+    ],
+    "faqs": [
+      "Does it help reduce frizz?",
+      "Can it be used on colored hair?",
+      "How long should I keep it on?",
+      "Does it work for dry hair?",
+      "Is steaming required after application?"
+    ]
+  },
+  {
+    "title": "Manicure Pedicure Kit",
+    "img": "https://images.unsplash.com/photo-1607344645866-8a4975a4c7af",
+    "price": "₹1,099",
+    "oldPrice": "₹1,799",
+    "discount": "39%",
+    "rating": "4.73 (39,562 ratings)",
+    "overview": ["Complete Nail Care", "Smooth Finish", "Easy to Use", "Hygienic Kit"],
+    "thingsToKnow": [
+      "Contains nail buffer, filer, and cuticle cream.",
+      "Single-use disposable tools for hygiene.",
+      "Avoid sharing kits.",
+      "Sanitise hands before use."
+    ],
+    "procedure": [
+      {
+        "title": "Nail Care Routine",
+        "desc": "Soak nails, trim, buff, and apply cuticle cream for polished look.",
+        "img": "https://images.unsplash.com/photo-1607344645866-8a4975a4c7af"
+      }
+    ],
+    "precautions": [
+      "Keep tools sanitized.",
+      "Avoid using on broken nails.",
+      "Dispose of single-use items after use.",
+      "Keep away from children."
+    ],
+    "faqs": [
+      "How often should I do manicure?",
+      "Is this kit safe for diabetics?",
+      "Can I reuse the tools?",
+      "Does it include nail polish?",
+      "How to prevent infections?"
+    ]
+  }
+]
