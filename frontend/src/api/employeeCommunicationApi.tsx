@@ -1,5 +1,5 @@
 import { authHeaders } from "./auth";
-const api = "http://localhost:5000/api"; // or use import.meta.env.VITE_API_URL
+const api = "https://server.digitalness.co.in/api"; // or use import.meta.env.VITE_API_URL
 export const getEmployeeCommunications = async (employeeId: string) => {
   const res = await fetch(
     `${api}/employees/${employeeId}/communications`,

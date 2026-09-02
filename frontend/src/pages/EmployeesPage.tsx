@@ -45,7 +45,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 
 type EmployeeStatus = "Active" | "Inactive";
 
@@ -1240,15 +1240,15 @@ export default function EmployeesPage() {
             key={dept.department}
             onClick={() => setSelectedDepartment(dept.department)}
             className={`rounded-xl border p-4 text-left transition-all ${selectedDepartment === dept.department
-                ? "bg-primary text-primary-foreground border-primary shadow-md"
-                : "bg-card border-border hover:border-primary/50"
+              ? "bg-primary text-primary-foreground border-primary shadow-md"
+              : "bg-card border-border hover:border-primary/50"
               }`}
           >
             <p className="text-2xl font-heading font-bold">{dept.count}</p>
             <p
               className={`text-sm ${selectedDepartment === dept.department
-                  ? "text-primary-foreground/80"
-                  : "text-muted-foreground"
+                ? "text-primary-foreground/80"
+                : "text-muted-foreground"
                 }`}
             >
               {dept.department}

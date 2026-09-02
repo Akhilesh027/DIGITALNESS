@@ -255,7 +255,7 @@ export function FloatingAICopilot() {
   const handleCreativeSchedule = async (scheduleData: any) => {
     try {
       const token = localStorage.getItem("token") || localStorage.getItem("authToken");
-      await fetch("http://localhost:5000/api/scheduled-jobs/update-slot", {
+      await fetch("https://server.digitalness.co.in/api/scheduled-jobs/update-slot", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -317,11 +317,10 @@ export function FloatingAICopilot() {
       {/* 2. FLOATING COPILOT MODAL / DRAWER PANEL */}
       {isOpen && (
         <div
-          className={`fixed z-50 transition-all duration-300 ease-out flex flex-col bg-slate-950/95 border border-indigo-500/30 shadow-[0_25px_70px_rgba(0,0,0,0.75)] backdrop-blur-2xl ring-1 ring-white/10 overflow-hidden ${
-            isExpanded
+          className={`fixed z-50 transition-all duration-300 ease-out flex flex-col bg-slate-950/95 border border-indigo-500/30 shadow-[0_25px_70px_rgba(0,0,0,0.75)] backdrop-blur-2xl ring-1 ring-white/10 overflow-hidden ${isExpanded
               ? "inset-4 sm:inset-10 md:inset-16 rounded-3xl"
               : "bottom-24 right-4 sm:right-6 w-[calc(100vw-32px)] sm:w-[440px] md:w-[460px] h-[620px] max-h-[82vh] rounded-2xl"
-          }`}
+            }`}
         >
           {/* TOP BAR / HEADER */}
           <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-b border-indigo-500/20">

@@ -11,7 +11,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
 
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = "https://server.digitalness.co.in/api";
 
 const AttachmentsScreen = () => {
   const [client, setClient] = useState(null);

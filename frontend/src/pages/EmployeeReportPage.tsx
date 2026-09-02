@@ -37,7 +37,7 @@ import {
   Tooltip,
 } from "recharts";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 
 interface Employee {
   _id: string;

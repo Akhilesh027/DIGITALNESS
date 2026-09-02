@@ -54,7 +54,7 @@ import jsPDF from "jspdf";
 import { getCustomerReadiness, getContextPreview, updateCustomer } from "../api/customerApi";
 import { authHeaders, jsonHeaders, getToken } from "@/api/auth";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 
 const DIGITALNESS_DETAILS = {
   companyName: "Digitalness",
@@ -775,12 +775,12 @@ export default function CustomersPage() {
             return (
               <motion.div key={customer._id} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }} className="bg-card rounded-2xl border border-border shadow-card p-5 hover:shadow-card-hover transition-all group">
                 <div className="flex items-start justify-between gap-3 mb-4">
-                    {customer.brandProfile?.logoUrl ? (
-                      <img src={customer.brandProfile.logoUrl} alt={customer.name} className="w-12 h-12 shrink-0 rounded-lg object-contain border border-border bg-white p-1" />
-                    ) : (
-                      <div className="w-12 h-12 shrink-0 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-lg">{customer.name?.charAt(0)?.toUpperCase() || "C"}</div>
-                    )}
-                    <div className="min-w-0"><h3 className="font-semibold text-foreground truncate">{customer.name}</h3><p className="text-sm text-muted-foreground truncate">{customer.companyName || customer.businessType || "Business"}</p></div>
+                  {customer.brandProfile?.logoUrl ? (
+                    <img src={customer.brandProfile.logoUrl} alt={customer.name} className="w-12 h-12 shrink-0 rounded-lg object-contain border border-border bg-white p-1" />
+                  ) : (
+                    <div className="w-12 h-12 shrink-0 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-lg">{customer.name?.charAt(0)?.toUpperCase() || "C"}</div>
+                  )}
+                  <div className="min-w-0"><h3 className="font-semibold text-foreground truncate">{customer.name}</h3><p className="text-sm text-muted-foreground truncate">{customer.companyName || customer.businessType || "Business"}</p></div>
                   <div className="flex gap-1">
                     <Button variant="ghost" size="sm" onClick={() => openEditCustomer(customer)}><Edit3 className="w-4 h-4" /></Button>
                     <Button variant="ghost" size="sm" onClick={() => setSelectedCustomer(customer)}><Eye className="w-4 h-4" /></Button>
@@ -1154,13 +1154,12 @@ function AgentReadinessPanel({ customerId }: { customerId: string }) {
                 <span className="font-semibold text-slate-700 block truncate">{label}</span>
                 <div className="flex items-center gap-1 mt-1">
                   <span
-                    className={`font-bold text-sm ${
-                      item.ready
+                    className={`font-bold text-sm ${item.ready
                         ? "text-emerald-600"
                         : item.score >= 50
-                        ? "text-amber-600"
-                        : "text-rose-600"
-                    }`}
+                          ? "text-amber-600"
+                          : "text-rose-600"
+                      }`}
                   >
                     {item.score}%
                   </span>

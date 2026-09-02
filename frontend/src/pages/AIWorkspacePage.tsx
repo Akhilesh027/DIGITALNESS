@@ -239,7 +239,7 @@ export default function AIWorkspacePage() {
     // Sync to backend /scheduler DB
     try {
       const token = localStorage.getItem("token");
-      await fetch("http://localhost:5000/api/scheduled-jobs/update-slot", {
+      await fetch("https://server.digitalness.co.in/api/scheduled-jobs/update-slot", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -292,7 +292,7 @@ export default function AIWorkspacePage() {
     const fetchCustomers = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch("http://localhost:5000/api/customers", {
+        const res = await fetch("https://server.digitalness.co.in/api/customers", {
           headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),

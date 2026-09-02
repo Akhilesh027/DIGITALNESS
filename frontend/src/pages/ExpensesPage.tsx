@@ -15,7 +15,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis
 import { Plus, IndianRupee, TrendingUp, TrendingDown, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API_URL = "http://localhost:5000/api/expenses";
+const API_URL = "https://server.digitalness.co.in/api/expenses";
 const getAuthHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 
 const COLORS = ['hsl(var(--primary))', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4', '#64748b'];

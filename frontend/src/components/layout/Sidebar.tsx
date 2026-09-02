@@ -388,14 +388,14 @@ export function Sidebar() {
         localStorage.getItem("accessToken");
 
       if (token) {
-        const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+        const apiUrl = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
         await fetch(`${apiUrl}/auth/logout`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-        }).catch(() => {});
+        }).catch(() => { });
       }
     } catch {
       // ignore

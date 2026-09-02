@@ -10,7 +10,7 @@ module.exports = {
   developerToken: process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "google_ads_dev_token_placeholder",
   redirectUri:
     process.env.GOOGLE_ADS_REDIRECT_URI ||
-    "http://localhost:5000/api/integrations/google-ads/callback",
+    "https://server.digitalness.co.in/api/integrations/google-ads/callback",
   scope: "https://www.googleapis.com/auth/adwords",
   managerCustomerId: process.env.GOOGLE_ADS_MANAGER_CUSTOMER_ID || null,
   realTestMaxDailyBudget: Number(process.env.GOOGLE_ADS_REAL_TEST_MAX_DAILY_BUDGET || 1000), // ₹1,000 max for tests

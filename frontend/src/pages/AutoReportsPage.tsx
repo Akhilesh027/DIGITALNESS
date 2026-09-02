@@ -21,7 +21,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 
 interface Customer {
   _id: string;

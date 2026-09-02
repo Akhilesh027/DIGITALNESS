@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = "https://server.digitalness.co.in/api";
 
 const DashboardScreen = () => {
   const [client, setClient] = useState(null);

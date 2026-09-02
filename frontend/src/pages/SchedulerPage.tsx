@@ -59,7 +59,7 @@ import {
   reconcileQueue,
 } from "../api/scheduledJobApi";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 
 export default function SchedulerPage() {
   const { toast } = useToast();
@@ -314,21 +314,19 @@ export default function SchedulerPage() {
             <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs">
               <button
                 onClick={() => setPlatformMock("instagram")}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
-                  platformMock === "instagram"
+                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${platformMock === "instagram"
                     ? "bg-white text-pink-600 shadow-xs"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 Instagram Mockup
               </button>
               <button
                 onClick={() => setPlatformMock("facebook")}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
-                  platformMock === "facebook"
+                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${platformMock === "facebook"
                     ? "bg-white text-blue-600 shadow-xs"
                     : "text-slate-600 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 Facebook Mockup
               </button>
@@ -382,8 +380,8 @@ export default function SchedulerPage() {
             const hashtags = (Array.isArray(content.hashtags) && content.hashtags.length > 0)
               ? content.hashtags
               : (Array.isArray(job.payload?.hashtags) && job.payload.hashtags.length > 0)
-              ? job.payload.hashtags
-              : (typeof job.payload?.hashtags === "string" ? job.payload.hashtags.split(/\s+/) : []);
+                ? job.payload.hashtags
+                : (typeof job.payload?.hashtags === "string" ? job.payload.hashtags.split(/\s+/) : []);
             const platforms = content.platforms || job.payload?.platforms || ["Instagram", "Facebook"];
             const client = job.customerId || {};
             const location = job.clientLocationId || {};
@@ -433,8 +431,8 @@ export default function SchedulerPage() {
                       job.status === "Completed"
                         ? "bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold"
                         : job.status === "Queued" || job.status === "Pending"
-                        ? "bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-bold"
-                        : "bg-rose-50 text-rose-700 border-rose-200 text-[10px] font-bold"
+                          ? "bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px] font-bold"
+                          : "bg-rose-50 text-rose-700 border-rose-200 text-[10px] font-bold"
                     }
                   >
                     {job.status === "Queued" || job.status === "Pending" ? "Queued" : job.status}
@@ -630,8 +628,8 @@ export default function SchedulerPage() {
                   const hashtags = (Array.isArray(content.hashtags) && content.hashtags.length > 0)
                     ? content.hashtags
                     : (Array.isArray(job.payload?.hashtags) && job.payload.hashtags.length > 0)
-                    ? job.payload.hashtags
-                    : (typeof job.payload?.hashtags === "string" ? job.payload.hashtags.split(/\s+/) : []);
+                      ? job.payload.hashtags
+                      : (typeof job.payload?.hashtags === "string" ? job.payload.hashtags.split(/\s+/) : []);
                   const platforms = content.platforms || job.payload?.platforms || ["Instagram", "Facebook"];
                   const posterImg =
                     job.payload?.imageUrl ||
@@ -728,10 +726,10 @@ export default function SchedulerPage() {
                             job.status === "Completed"
                               ? "bg-emerald-50 text-emerald-700 border-emerald-200 font-bold"
                               : job.status === "Queued" || job.status === "Pending"
-                              ? "bg-indigo-50 text-indigo-700 border-indigo-200 font-bold"
-                              : job.status === "Failed"
-                              ? "bg-rose-50 text-rose-700 border-rose-200 font-bold"
-                              : "bg-slate-100 text-slate-600"
+                                ? "bg-indigo-50 text-indigo-700 border-indigo-200 font-bold"
+                                : job.status === "Failed"
+                                  ? "bg-rose-50 text-rose-700 border-rose-200 font-bold"
+                                  : "bg-slate-100 text-slate-600"
                           }
                         >
                           {job.status === "Queued" || job.status === "Pending" ? "Queued" : job.status}
@@ -814,8 +812,8 @@ export default function SchedulerPage() {
               const hashtags = (Array.isArray(content.hashtags) && content.hashtags.length > 0)
                 ? content.hashtags
                 : (Array.isArray(selectedJob.payload?.hashtags) && selectedJob.payload.hashtags.length > 0)
-                ? selectedJob.payload.hashtags
-                : (typeof selectedJob.payload?.hashtags === "string" ? selectedJob.payload.hashtags.split(/\s+/) : []);
+                  ? selectedJob.payload.hashtags
+                  : (typeof selectedJob.payload?.hashtags === "string" ? selectedJob.payload.hashtags.split(/\s+/) : []);
               const platforms = content.platforms || selectedJob.payload?.platforms || ["Instagram", "Facebook"];
               const client = selectedJob.customerId || {};
               const location = selectedJob.clientLocationId || {};

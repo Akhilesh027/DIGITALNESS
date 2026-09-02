@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = `${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/marketing-connections`;
+const API_URL = `${import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api"}/marketing-connections`;
 
 const getAuthHeaders = () => {
   const token =
@@ -92,7 +92,7 @@ export const checkConnectionHealth = async (connectionId: string): Promise<Conne
 };
 
 export const startMetaOAuth = async (customerId: string, locationId?: string) => {
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const baseUrl = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
   const params = new URLSearchParams({ customerId });
   if (locationId) params.append("locationId", locationId);
   const response = await axios.get(`${baseUrl}/integrations/meta/connect?${params.toString()}`, getAuthHeaders());
@@ -100,7 +100,7 @@ export const startMetaOAuth = async (customerId: string, locationId?: string) =>
 };
 
 export const getMetaDiscoverySession = async (sessionId: string) => {
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const baseUrl = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
   const response = await axios.get(`${baseUrl}/integrations/meta/discovery/${sessionId}`, getAuthHeaders());
   return response.data.data;
 };
@@ -115,13 +115,13 @@ export const confirmMetaAssets = async (payload: {
     metaAdAccountId?: string;
   };
 }) => {
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const baseUrl = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
   const response = await axios.post(`${baseUrl}/integrations/meta/confirm-assets`, payload, getAuthHeaders());
   return response.data.data;
 };
 
 export const startGoogleBusinessOAuth = async (customerId: string, locationId?: string) => {
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const baseUrl = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
   const params = new URLSearchParams({ customerId });
   if (locationId) params.append("locationId", locationId);
   const response = await axios.get(`${baseUrl}/integrations/google-business/connect?${params.toString()}`, getAuthHeaders());
@@ -129,7 +129,7 @@ export const startGoogleBusinessOAuth = async (customerId: string, locationId?: 
 };
 
 export const getGoogleBusinessDiscoverySession = async (sessionId: string) => {
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const baseUrl = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
   const response = await axios.get(`${baseUrl}/integrations/google-business/discovery/${sessionId}`, getAuthHeaders());
   return response.data;
 };
@@ -141,7 +141,7 @@ export const confirmGoogleBusinessLocation = async (payload: {
   googleAccountId: string;
   googleLocationId: string;
 }) => {
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const baseUrl = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
   const response = await axios.post(`${baseUrl}/integrations/google-business/confirm-location`, payload, getAuthHeaders());
   return response.data;
 };

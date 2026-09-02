@@ -114,7 +114,7 @@ interface User {
 
 type DashboardMode = 'admin' | 'manager' | 'telecaller' | 'employee';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'https://server.digitalness.co.in/api';
 
 // ===================== HELPERS =====================
 function extractId(value: any): string | null {

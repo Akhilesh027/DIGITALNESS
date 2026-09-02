@@ -166,11 +166,11 @@ export default function CustomerOnboardingPage() {
       setLoading(true);
       const token = localStorage.getItem("token");
       const [resCust, resReadiness, resLocs, resAssets, resMemories] = await Promise.all([
-        fetch(`http://localhost:5000/api/customers/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`https://server.digitalness.co.in/api/customers/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
         getCustomerReadiness(id!).catch(() => null),
-        fetch(`http://localhost:5000/api/client-locations?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`http://localhost:5000/api/client-attachments?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).catch(() => ({ data: [] })),
-        fetch(`http://localhost:5000/api/ai-memory?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`https://server.digitalness.co.in/api/client-locations?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`https://server.digitalness.co.in/api/client-attachments?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).catch(() => ({ data: [] })),
+        fetch(`https://server.digitalness.co.in/api/ai-memory?customerId=${id}`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()).catch(() => ({ data: [] })),
       ]);
 
       if (!resCust.ok) throw new Error("Failed to load customer details");
@@ -472,13 +472,12 @@ export default function CustomerOnboardingPage() {
             <div
               key={s.num}
               onClick={() => setStep(s.num)}
-              className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${
-                isActive
+              className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${isActive
                   ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
                   : isDone
-                  ? "text-emerald-700"
-                  : "text-slate-400 hover:text-slate-600"
-              }`}
+                    ? "text-emerald-700"
+                    : "text-slate-400 hover:text-slate-600"
+                }`}
             >
               {isDone ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Icon className="h-4 w-4" />}
               <span>{s.num}. {s.label}</span>

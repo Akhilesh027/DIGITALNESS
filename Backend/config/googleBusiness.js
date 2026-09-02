@@ -8,7 +8,7 @@ module.exports = {
   clientSecret: process.env.GOOGLE_CLIENT_SECRET || "google_client_secret_placeholder",
   redirectUri:
     process.env.GOOGLE_BUSINESS_REDIRECT_URI ||
-    "http://localhost:5000/api/integrations/google-business/callback",
+    "https://server.digitalness.co.in/api/integrations/google-business/callback",
   scope:
     process.env.GOOGLE_BUSINESS_SCOPE ||
     "https://www.googleapis.com/auth/business.manage",
