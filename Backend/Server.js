@@ -36,6 +36,12 @@ const allowedOrigins = [
   "https://crm-digitalness.netlify.app",
   "https://dist-2cyxl5utn-akhilesh027s-projects.vercel.app",
   "https://chic-pony-e330ef.netlify.app",
+  "http://digitalness.co.in",
+  "https://digitalness.co.in",
+  "http://www.digitalness.co.in",
+  "https://www.digitalness.co.in",
+  "http://server.digitalness.co.in",
+  "https://server.digitalness.co.in",
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
