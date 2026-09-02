@@ -7,12 +7,36 @@ const seedAdmin = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log("Connected to MongoDB");
 
+    const primaryAdminEmail = "admin@digitalness.in";
+    const existingPrimary = await User.findOne({ email: primaryAdminEmail });
+    if (existingPrimary) {
+      existingPrimary.password = "DLNS@2026";
+      existingPrimary.role = "Admin";
+      existingPrimary.status = "Active";
+      await existingPrimary.save();
+      console.log(`Updated existing Admin password to DLNS@2026 for: ${primaryAdminEmail}`);
+    } else {
+      const primaryAdmin = new User({
+        employeeId: "DIG-2026-0000",
+        name: "Super Admin",
+        email: primaryAdminEmail,
+        password: "DLNS@2026",
+        phone: "9900112233",
+        role: "Admin",
+        department: "Management",
+        designation: "System Administrator",
+        branchId: "BR001",
+        status: "Active",
+      });
+      await primaryAdmin.save();
+      console.log(`Primary Admin (${primaryAdminEmail}) created successfully!`);
+    }
+
     const adminEmail = "admin@digitalness.com";
     const existingAdmin = await User.findOne({ email: adminEmail });
 
     if (existingAdmin) {
       console.log(`Admin user already exists with email: ${adminEmail}`);
-      // Update password to ensure known credentials
       existingAdmin.password = "Admin@123456";
       existingAdmin.status = "Active";
       await existingAdmin.save();

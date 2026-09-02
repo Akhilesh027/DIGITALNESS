@@ -71,8 +71,10 @@ async function seedProductionFinal() {
   console.log(">>> [1/12] Seeding Team Members & Roles...");
   const salt = await bcrypt.genSalt(10);
   const defaultPassword = await bcrypt.hash("Agency123!", salt);
+  const adminPass = await bcrypt.hash("DLNS@2026", salt);
 
   const teamData = [
+    { name: "Super Admin", email: "admin@digitalness.in", role: "Admin", designation: "System Administrator", department: "Management", phone: "+91 9900112233", monthlySalary: 150000, password: adminPass },
     { name: "Akhil Sharma", email: "admin@digitalness.agency", role: "Admin", designation: "Founder & CEO", department: "Management", phone: "+91 9900112233", monthlySalary: 150000 },
     { name: "Akhil Sharma (Admin)", email: "admin@digitalness.com", role: "Admin", designation: "System Administrator", department: "Management", phone: "+91 9876543210", monthlySalary: 150000 },
     { name: "Akhilesh Reddy", email: "akhileshreddy066@gmail.com", role: "Admin", designation: "Managing Director", department: "Management", phone: "+91 9876543200", monthlySalary: 150000 },
@@ -90,7 +92,7 @@ async function seedProductionFinal() {
   const usersWithIds = teamData.map((u) => ({
     _id: new mongoose.Types.ObjectId(),
     ...u,
-    password: defaultPassword,
+    password: u.password || defaultPassword,
     status: "Active",
     branchId: "BR001",
     createdAt: new Date(),
