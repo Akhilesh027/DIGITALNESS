@@ -99,7 +99,7 @@ export const CreativeStudioVisualEditor: React.FC<CreativeStudioVisualEditorProp
     latestVersion?.phone || customer?.contactNumbers?.[0] || customer?.phone || "+91 98765 43214"
   );
   const [website, setWebsite] = useState(
-    latestVersion?.website || customer?.website || "www.digitalness.agency"
+    latestVersion?.website || customer?.website || ""
   );
   const [locationName, setLocationName] = useState(
     latestVersion?.locationName || customer?.city || "Hyderabad HQ"
@@ -176,7 +176,7 @@ export const CreativeStudioVisualEditor: React.FC<CreativeStudioVisualEditorProp
   const [isRegeneratingBg, setIsRegeneratingBg] = useState(false);
 
   // Social Captions & Hashtags State
-  const defaultCaptionText = `✨ **${headline}** ✨\n\n${subheadline}\n\n🌟 **Why Choose ${customer?.name || "Us"}:**\n• Premium Quality & Certified Excellence\n• Tailored Solutions & Dedicated Support\n• Limited-Time Exclusive Privilege\n\n📍 **Location:** ${locationName}\n📞 **Direct Line:** ${phone}\n🌐 **Official Website:** ${website}\n\n👉 **${ctaText} — Tap the link in bio to get started!**`;
+  const defaultCaptionText = `✨ **${headline}** ✨\n\n${subheadline}\n\n🌟 **Why Choose ${customer?.name || "Us"}:**\n• Premium Quality & Certified Excellence\n• Tailored Solutions & Dedicated Support\n• Limited-Time Exclusive Privilege\n\n📍 **Location:** ${locationName}\n📞 **Direct Line:** ${phone}${website ? `\n🌐 **Official Website:** ${website}` : ""}\n\n👉 **${ctaText} — Tap the link in bio to get started!**`;
 
   const [socialCaption, setSocialCaption] = useState(defaultCaptionText);
   const [socialHashtags, setSocialHashtags] = useState(
@@ -977,6 +977,7 @@ export const CreativeStudioVisualEditor: React.FC<CreativeStudioVisualEditorProp
                 <Input
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="e.g. www.brand.com (optional)"
                   className="text-xs"
                 />
               </div>

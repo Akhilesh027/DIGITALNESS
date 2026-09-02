@@ -41,7 +41,7 @@ export const UniversalPosterQAPreviewCard: React.FC<UniversalPosterQAPreviewCard
 
   const client = block.client || {
     name: "Digitalness Pilot",
-    website: "www.digitalness.agency",
+    website: "",
     primaryColors: "#0B0F19 + #06B6D4",
   };
 
@@ -50,13 +50,13 @@ export const UniversalPosterQAPreviewCard: React.FC<UniversalPosterQAPreviewCard
     launchDate: "Immediate",
     headline: "Scale Your Digital Presence & Revenue",
     supportingLine: "End-to-end performance marketing and growth engineering tailored for modern brands.",
-    website: client.website || "www.digitalness.agency",
+    website: client.website || "",
   };
 
   const socialCopy = block.socialCopy || {
-    caption: `✨ ${(campaign.headline || "Scale Your Digital Presence & Revenue").toUpperCase()} ✨\n\n${campaign.supportingLine}.\n\n📞 Phone: ${client?.phone || "+91 91234 56789"}\n🌐 Website: ${client?.website || "www.digitalness.agency"}\n\n👉 Get Started Today`,
-    instagramCaption: `✨ ${(campaign.headline || "Scale Your Digital Presence & Revenue").toUpperCase()} ✨\n\n${campaign.supportingLine}.\n\n📞 Phone: ${client?.phone || "+91 91234 56789"}\n🌐 Website: ${client?.website || "www.digitalness.agency"}\n\n👉 Get Started Today`,
-    facebookCaption: `📢 ${campaign.headline}!\n\n${campaign.supportingLine}.\n\nVisit: ${client?.website || "www.digitalness.agency"}`,
+    caption: `✨ ${(campaign.headline || "Scale Your Digital Presence & Revenue").toUpperCase()} ✨\n\n${campaign.supportingLine}.\n\n📞 Phone: ${client?.phone || "+91 91234 56789"}${client?.website ? `\n🌐 Website: ${client.website}` : ""}\n\n👉 Get Started Today`,
+    instagramCaption: `✨ ${(campaign.headline || "Scale Your Digital Presence & Revenue").toUpperCase()} ✨\n\n${campaign.supportingLine}.\n\n📞 Phone: ${client?.phone || "+91 91234 56789"}${client?.website ? `\n🌐 Website: ${client.website}` : ""}\n\n👉 Get Started Today`,
+    facebookCaption: `📢 ${campaign.headline}!\n\n${campaign.supportingLine}.${client?.website ? `\n\nVisit: ${client.website}` : ""}`,
     hashtags: [
       "#DigitalMarketing",
       "#SocialMediaMarketing",

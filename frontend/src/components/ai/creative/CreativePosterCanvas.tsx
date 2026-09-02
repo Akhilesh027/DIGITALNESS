@@ -45,7 +45,7 @@ export const CreativePosterCanvas: React.FC<CreativePosterCanvasProps> = ({
   accentColor = "#F59E0B",
   secondaryColor = "#FEF3C7",
   phone = "+91 98765 43214",
-  website = "www.digitalness.agency",
+  website = "",
   locationName = "Flagship HQ",
   showLogo = true,
   logoScale = 1.0,
@@ -370,26 +370,28 @@ export const CreativePosterCanvas: React.FC<CreativePosterCanvasProps> = ({
           />
           {phone && (
             <text
-              x="70"
+              x={website ? "70" : "470"}
               y="48"
               fill="#FFFFFF"
               fontFamily="system-ui, sans-serif"
               fontSize="19"
               fontWeight="800"
               letterSpacing="0.5"
+              textAnchor={website ? "start" : "middle"}
             >
               📞 {phone}
             </text>
           )}
           {website && (
             <text
-              x={phone ? "520" : "70"}
+              x={phone ? "520" : "470"}
               y="48"
               fill="#38BDF8"
               fontFamily="system-ui, sans-serif"
               fontSize="19"
               fontWeight="800"
               letterSpacing="0.5"
+              textAnchor={phone ? "start" : "middle"}
             >
               🌐 {website}
             </text>

@@ -19,7 +19,7 @@ export const DynamicPosterCanvas: React.FC<DynamicPosterCanvasProps> = ({
   launchDate = "12 SEP 2026",
   headline = "OUR NEW WEBSITE IS LIVE",
   supportingLine = "A BETTER DIGITAL EXPERIENCE BEGINS THIS SEPTEMBER",
-  website = "www.client1.com",
+  website = "",
   aspectRatio = "4:5",
   primaryColor = "#0A192F",
   accentColor = "#D4AF37",
@@ -144,10 +144,17 @@ export const DynamicPosterCanvas: React.FC<DynamicPosterCanvasProps> = ({
               background: `linear-gradient(90deg, #FDE68A, ${accentColor}, #F59E0B)`,
             }}
           >
-            <div className="flex items-center gap-1.5">
-              <Globe className="w-3.5 h-3.5" />
-              <span className="tracking-wide font-mono text-[11px]">{website}</span>
-            </div>
+            {website ? (
+              <div className="flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5" />
+                <span className="tracking-wide font-mono text-[11px]">{website}</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="tracking-wide font-sans text-[11px] font-extrabold">{eventName.toUpperCase()}</span>
+              </div>
+            )}
             <div className="flex items-center gap-1 text-[11px] uppercase tracking-wider font-extrabold">
               <span>EXPLORE</span>
               <ArrowUpRight className="w-3.5 h-3.5 stroke-[3]" />

@@ -22,7 +22,7 @@ class CreativeRenderer {
     const brandName = brandContext.brandName || brandContext.name || "ApexBee Technologies";
     const locationName = brandContext.locationName || brandContext.city || "Hyderabad";
     const phone = brandContext.phone || "9988776655";
-    const website = brandContext.website || "apexbee.in";
+    const website = brandContext.website || "";
     const address = brandContext.address || "Hitech City, Hyderabad";
     const logoUrl = brandContext.logoUrl || null;
 
@@ -147,15 +147,16 @@ class CreativeRenderer {
   </g>
 
   <!-- Bottom Footer: Verified Contact Pill (Phone + Website) -->
+  ${(phone || website) ? `
   <g transform="translate(80, 945)">
     <rect width="920" height="76" rx="26" fill="#020617" opacity="0.94" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
-    <text x="70" y="46" font-family="'Poppins', sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">
+    ${phone ? `<text x="${website ? '70' : '460'}" y="46" font-family="'Poppins', sans-serif" font-size="18" font-weight="700" fill="#FFFFFF" ${!website ? 'text-anchor="middle"' : ''}>
       📞 ${safePhone}
-    </text>
-    <text x="500" y="46" font-family="'Poppins', sans-serif" font-size="18" font-weight="700" fill="#38BDF8">
+    </text>` : ''}
+    ${website ? `<text x="${phone ? '500' : '460'}" y="46" font-family="'Poppins', sans-serif" font-size="18" font-weight="700" fill="#38BDF8" ${!phone ? 'text-anchor="middle"' : ''}>
       🌐 ${safeWebsite}
-    </text>
-  </g>
+    </text>` : ''}
+  </g>` : ''}
 </svg>`;
 
     const svgBuffer = Buffer.from(svgTemplate, "utf8");

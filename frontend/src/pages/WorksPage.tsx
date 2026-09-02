@@ -190,6 +190,438 @@ const toDateInput = (date?: string) => {
   }
 };
 
+const getEmployeeOptionName = (emp: any) =>
+  emp?.name || emp?.fullName || emp?.username || emp?.email || "Unnamed User";
+
+const formatFileSize = (size?: number) => {
+  if (!size) return "";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+interface WorkFormFieldsProps {
+  form: WorkForm;
+  setForm: (data: WorkForm) => void;
+  loadingState: boolean;
+  mode: "create" | "edit";
+  customers: any[];
+  works: any[];
+  employees: any[];
+  employeeWorkload: any[];
+  handleFormFileUpload: (files: FileList | null, mode: "create" | "edit") => void;
+}
+
+const WorkFormFields = ({
+  form,
+  setForm,
+  loadingState,
+  mode,
+  customers,
+  works,
+  employees,
+  employeeWorkload,
+  handleFormFileUpload,
+}: WorkFormFieldsProps) => (
+  <div className="space-y-4">
+    <div>
+      <label className="text-sm font-medium mb-1 block">Title *</label>
+      <Input
+        disabled={loadingState}
+        value={form.title}
+        onChange={(e) => setForm({ ...form, title: e.target.value })}
+        placeholder="Work title"
+      />
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label className="text-sm font-medium mb-1 block">Customer *</label>
+        <Select
+          disabled={loadingState}
+          value={form.customerId}
+          onValueChange={(v) => setForm({ ...form, customerId: v })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select customer" />
+          </SelectTrigger>
+          <SelectContent>
+            {customers.map((c: any) => {
+              const customerId = c._id || c.id;
+              const customerName =
+                c.name ||
+                c.customerName ||
+                c.clientName ||
+                c.companyName ||
+                "Unnamed Customer";
+              return (
+                <SelectItem key={customerId} value={customerId}>
+                  {customerName}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium mb-1 block">
+          Parent Work / Sub Task
+        </label>
+        <Select
+          disabled={loadingState}
+          value={form.parentWorkId || "none"}
+          onValueChange={(v) =>
+            setForm({ ...form, parentWorkId: v === "none" ? "" : v })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="No parent work" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No Parent Work</SelectItem>
+            {works
+              .filter((work) => work.id !== form.id)
+              .map((work) => (
+                <SelectItem key={work.id} value={work.id}>
+                  {work.title}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label className="text-sm font-medium mb-1 block">Type *</label>
+        <Select
+          disabled={loadingState}
+          value={form.type}
+          onValueChange={(v) => setForm({ ...form, type: v })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select type" />
+          </SelectTrigger>
+          <SelectContent>
+            {projectTypes.map((type) => (
+              <SelectItem key={type} value={type}>
+                {type}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div>
+        <label className="text-sm font-medium mb-1 block">Priority</label>
+        <Select
+          disabled={loadingState}
+          value={form.priority}
+          onValueChange={(v: WorkPriority) =>
+            setForm({ ...form, priority: v })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {["Low", "Medium", "High", "Urgent"].map((priority) => (
+              <SelectItem key={priority} value={priority}>
+                {priority}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
+    {mode === "edit" && (
+      <div>
+        <label className="text-sm font-medium mb-1 block">Status</label>
+        <Select
+          disabled={loadingState}
+          value={form.status}
+          onValueChange={(v: WorkStatus) => setForm({ ...form, status: v })}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {statuses.map((status) => (
+              <SelectItem key={status} value={status}>
+                {status}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    )}
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div>
+        <label className="text-sm font-medium mb-1 block">Due Date</label>
+        <Input
+          disabled={loadingState}
+          type="date"
+          value={form.dueDate}
+          onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
+        />
+      </div>
+      <div>
+        <label className="text-sm font-medium mb-1 block">SLA Days</label>
+        <Input
+          disabled={loadingState}
+          type="number"
+          min={1}
+          value={form.slaDays}
+          onChange={(e) =>
+            setForm({ ...form, slaDays: Number(e.target.value || 1) })
+          }
+        />
+      </div>
+      <div>
+        <label className="text-sm font-medium mb-1 block">
+          Estimated Hours
+        </label>
+        <Input
+          disabled={loadingState}
+          type="number"
+          min={0}
+          value={form.estimatedHours}
+          onChange={(e) =>
+            setForm({ ...form, estimatedHours: Number(e.target.value || 0) })
+          }
+        />
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label className="text-sm font-medium mb-1 block">
+          Total Deliverables
+        </label>
+        <Input
+          disabled={loadingState}
+          type="number"
+          min={1}
+          value={form.deliverables}
+          onChange={(e) =>
+            setForm({ ...form, deliverables: parseInt(e.target.value) || 1 })
+          }
+        />
+      </div>
+      {mode === "edit" && (
+        <div>
+          <label className="text-sm font-medium mb-1 block">
+            Completed Deliverables
+          </label>
+          <Input
+            disabled={loadingState}
+            type="number"
+            min={0}
+            value={form.completedDeliverables}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                completedDeliverables: parseInt(e.target.value) || 0,
+              })
+            }
+          />
+        </div>
+      )}
+    </div>
+
+    <div>
+      <label className="text-sm font-medium mb-2 block">Assign Users *</label>
+      <div className="grid grid-cols-1 gap-2 max-h-44 overflow-y-auto border rounded-lg p-3">
+        {employees.map((emp: any) => {
+          const empId = emp._id || emp.id;
+          const empName = getEmployeeOptionName(emp);
+          const empRole = emp.role || emp.department || "Employee";
+          const workload =
+            employeeWorkload.find((item: any) => item.id === empId)
+              ?.assignedCount || 0;
+
+          return (
+            <div key={empId} className="flex items-center gap-2">
+              <Checkbox
+                disabled={loadingState}
+                id={`${mode}-emp-${empId}`}
+                checked={form.assignedTo.includes(empId)}
+                onCheckedChange={(checked) => {
+                  if (checked)
+                    setForm({
+                      ...form,
+                      assignedTo: [...form.assignedTo, empId],
+                    });
+                  else
+                    setForm({
+                      ...form,
+                      assignedTo: form.assignedTo.filter(
+                        (id) => id !== empId,
+                      ),
+                    });
+                }}
+              />
+              <label
+                htmlFor={`${mode}-emp-${empId}`}
+                className="text-sm flex-1"
+              >
+                {empName}{" "}
+                <span className="text-muted-foreground">({empRole})</span>
+              </label>
+              <Badge variant="secondary">{workload} works</Badge>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+
+    <div>
+      <label className="text-sm font-medium mb-1 block">Description</label>
+      <Textarea
+        disabled={loadingState}
+        value={form.description}
+        onChange={(e) => setForm({ ...form, description: e.target.value })}
+        placeholder="Work description, expected output, references, blockers, notes"
+      />
+    </div>
+
+    <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-4 space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 font-medium text-sm">
+          <Paperclip className="w-4 h-4" /> Attachments / Uploads
+        </div>
+        <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted">
+          <UploadCloud className="h-4 w-4" /> Upload Files
+          <input
+            type="file"
+            multiple
+            className="hidden"
+            disabled={loadingState}
+            onChange={(e) => {
+              handleFormFileUpload(e.target.files, mode);
+              e.currentTarget.value = "";
+            }}
+          />
+        </label>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        You can upload screenshots, PDFs, design files or add external file
+        links. Local uploads are converted into preview URLs; connect backend
+        upload later for cloud storage.
+      </p>
+
+      <div className="space-y-3">
+        {form.attachments.length === 0 && (
+          <div className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
+            No attachments added yet
+          </div>
+        )}
+
+        {form.attachments.map((attachment, index) => (
+          <div
+            key={index}
+            className="grid grid-cols-1 gap-2 rounded-xl border bg-background p-3 lg:grid-cols-[1fr_1fr_auto]"
+          >
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                File Name
+              </label>
+              <Input
+                value={attachment.fileName}
+                onChange={(e) => {
+                  const next = [...form.attachments];
+                  next[index] = { ...next[index], fileName: e.target.value };
+                  setForm({ ...form, attachments: next });
+                }}
+                placeholder="File name"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">
+                File URL / Uploaded Data
+              </label>
+              <Input
+                value={
+                  attachment.fileUrl?.startsWith("data:")
+                    ? "Uploaded file ready"
+                    : attachment.fileUrl
+                }
+                onChange={(e) => {
+                  const next = [...form.attachments];
+                  next[index] = {
+                    ...next[index],
+                    fileUrl: e.target.value,
+                    isLocal: false,
+                  };
+                  setForm({ ...form, attachments: next });
+                }}
+                placeholder="Paste file URL"
+                disabled={attachment.fileUrl?.startsWith("data:")}
+              />
+              {(attachment.fileType || attachment.fileSize) && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {attachment.fileType || "file"}{" "}
+                  {formatFileSize(attachment.fileSize)
+                    ? `· ${formatFileSize(attachment.fileSize)}`
+                    : ""}
+                </p>
+              )}
+            </div>
+            <div className="flex items-end gap-2">
+              {attachment.fileUrl && (
+                <Button
+                  variant="outline"
+                  type="button"
+                  className="flex-1 lg:flex-none"
+                  onClick={() => window.open(attachment.fileUrl, "_blank")}
+                >
+                  Open
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                type="button"
+                className="flex-1 text-destructive hover:text-destructive lg:flex-none"
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    attachments: form.attachments.filter(
+                      (_, i) => i !== index,
+                    ),
+                  })
+                }
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Button
+        variant="outline"
+        size="sm"
+        type="button"
+        onClick={() =>
+          setForm({
+            ...form,
+            attachments: [
+              ...form.attachments,
+              { fileName: "", fileUrl: "", fileType: "" },
+            ],
+          })
+        }
+      >
+        <Plus className="w-3 h-3 mr-1" /> Add Link Manually
+      </Button>
+    </div>
+  </div>
+);
+
 export default function WorksPage() {
   const { toast } = useToast();
 
@@ -253,7 +685,7 @@ export default function WorksPage() {
   };
 
   const getEmployeeOptionName = (emp: any) =>
-    emp.name || emp.fullName || emp.username || emp.email || "Unnamed User";
+    emp?.name || emp?.fullName || emp?.username || emp?.email || "Unnamed User";
 
   const getEmployeeName = (employee: any) => {
     if (typeof employee === "object") {
@@ -1137,415 +1569,7 @@ export default function WorksPage() {
     </div>
   );
 
-  const WorkFormFields = ({
-    form,
-    setForm,
-    loadingState,
-    mode,
-  }: {
-    form: WorkForm;
-    setForm: (data: WorkForm) => void;
-    loadingState: boolean;
-    mode: "create" | "edit";
-  }) => (
-    <div className="space-y-4">
-      <div>
-        <label className="text-sm font-medium mb-1 block">Title *</label>
-        <Input
-          disabled={loadingState}
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-          placeholder="Work title"
-        />
-      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="text-sm font-medium mb-1 block">Customer *</label>
-          <Select
-            disabled={loadingState}
-            value={form.customerId}
-            onValueChange={(v) => setForm({ ...form, customerId: v })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select customer" />
-            </SelectTrigger>
-            <SelectContent>
-              {customers.map((c: any) => {
-                const customerId = c._id || c.id;
-                const customerName =
-                  c.name ||
-                  c.customerName ||
-                  c.clientName ||
-                  c.companyName ||
-                  "Unnamed Customer";
-                return (
-                  <SelectItem key={customerId} value={customerId}>
-                    {customerName}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium mb-1 block">
-            Parent Work / Sub Task
-          </label>
-          <Select
-            disabled={loadingState}
-            value={form.parentWorkId || "none"}
-            onValueChange={(v) =>
-              setForm({ ...form, parentWorkId: v === "none" ? "" : v })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="No parent work" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">No Parent Work</SelectItem>
-              {works
-                .filter((work) => work.id !== form.id)
-                .map((work) => (
-                  <SelectItem key={work.id} value={work.id}>
-                    {work.title}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="text-sm font-medium mb-1 block">Type *</label>
-          <Select
-            disabled={loadingState}
-            value={form.type}
-            onValueChange={(v) => setForm({ ...form, type: v })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select type" />
-            </SelectTrigger>
-            <SelectContent>
-              {projectTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium mb-1 block">Priority</label>
-          <Select
-            disabled={loadingState}
-            value={form.priority}
-            onValueChange={(v: WorkPriority) =>
-              setForm({ ...form, priority: v })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {["Low", "Medium", "High", "Urgent"].map((priority) => (
-                <SelectItem key={priority} value={priority}>
-                  {priority}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {mode === "edit" && (
-        <div>
-          <label className="text-sm font-medium mb-1 block">Status</label>
-          <Select
-            disabled={loadingState}
-            value={form.status}
-            onValueChange={(v: WorkStatus) => setForm({ ...form, status: v })}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {statuses.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <div>
-          <label className="text-sm font-medium mb-1 block">Due Date</label>
-          <Input
-            disabled={loadingState}
-            type="date"
-            value={form.dueDate}
-            onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium mb-1 block">SLA Days</label>
-          <Input
-            disabled={loadingState}
-            type="number"
-            min={1}
-            value={form.slaDays}
-            onChange={(e) =>
-              setForm({ ...form, slaDays: Number(e.target.value || 1) })
-            }
-          />
-        </div>
-        <div>
-          <label className="text-sm font-medium mb-1 block">
-            Estimated Hours
-          </label>
-          <Input
-            disabled={loadingState}
-            type="number"
-            min={0}
-            value={form.estimatedHours}
-            onChange={(e) =>
-              setForm({ ...form, estimatedHours: Number(e.target.value || 0) })
-            }
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="text-sm font-medium mb-1 block">
-            Total Deliverables
-          </label>
-          <Input
-            disabled={loadingState}
-            type="number"
-            min={1}
-            value={form.deliverables}
-            onChange={(e) =>
-              setForm({ ...form, deliverables: parseInt(e.target.value) || 1 })
-            }
-          />
-        </div>
-        {mode === "edit" && (
-          <div>
-            <label className="text-sm font-medium mb-1 block">
-              Completed Deliverables
-            </label>
-            <Input
-              disabled={loadingState}
-              type="number"
-              min={0}
-              value={form.completedDeliverables}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  completedDeliverables: parseInt(e.target.value) || 0,
-                })
-              }
-            />
-          </div>
-        )}
-      </div>
-
-      <div>
-        <label className="text-sm font-medium mb-2 block">Assign Users *</label>
-        <div className="grid grid-cols-1 gap-2 max-h-44 overflow-y-auto border rounded-lg p-3">
-          {employees.map((emp: any) => {
-            const empId = emp._id || emp.id;
-            const empName = getEmployeeOptionName(emp);
-            const empRole = emp.role || emp.department || "Employee";
-            const workload =
-              employeeWorkload.find((item) => item.id === empId)
-                ?.assignedCount || 0;
-
-            return (
-              <div key={empId} className="flex items-center gap-2">
-                <Checkbox
-                  disabled={loadingState}
-                  id={`${mode}-emp-${empId}`}
-                  checked={form.assignedTo.includes(empId)}
-                  onCheckedChange={(checked) => {
-                    if (checked)
-                      setForm({
-                        ...form,
-                        assignedTo: [...form.assignedTo, empId],
-                      });
-                    else
-                      setForm({
-                        ...form,
-                        assignedTo: form.assignedTo.filter(
-                          (id) => id !== empId,
-                        ),
-                      });
-                  }}
-                />
-                <label
-                  htmlFor={`${mode}-emp-${empId}`}
-                  className="text-sm flex-1"
-                >
-                  {empName}{" "}
-                  <span className="text-muted-foreground">({empRole})</span>
-                </label>
-                <Badge variant="secondary">{workload} works</Badge>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <div>
-        <label className="text-sm font-medium mb-1 block">Description</label>
-        <Textarea
-          disabled={loadingState}
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-          placeholder="Work description, expected output, references, blockers, notes"
-        />
-      </div>
-
-      <div className="rounded-2xl border border-dashed border-border bg-muted/30 p-4 space-y-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2 font-medium text-sm">
-            <Paperclip className="w-4 h-4" /> Attachments / Uploads
-          </div>
-          <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium hover:bg-muted">
-            <UploadCloud className="h-4 w-4" /> Upload Files
-            <input
-              type="file"
-              multiple
-              className="hidden"
-              disabled={loadingState}
-              onChange={(e) => {
-                handleFormFileUpload(e.target.files, mode);
-                e.currentTarget.value = "";
-              }}
-            />
-          </label>
-        </div>
-
-        <p className="text-xs text-muted-foreground">
-          You can upload screenshots, PDFs, design files or add external file
-          links. Local uploads are converted into preview URLs; connect backend
-          upload later for cloud storage.
-        </p>
-
-        <div className="space-y-3">
-          {form.attachments.length === 0 && (
-            <div className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
-              No attachments added yet
-            </div>
-          )}
-
-          {form.attachments.map((attachment, index) => (
-            <div
-              key={index}
-              className="grid grid-cols-1 gap-2 rounded-xl border bg-background p-3 lg:grid-cols-[1fr_1fr_auto]"
-            >
-              <div>
-                <label className="mb-1 block text-xs text-muted-foreground">
-                  File Name
-                </label>
-                <Input
-                  value={attachment.fileName}
-                  onChange={(e) => {
-                    const next = [...form.attachments];
-                    next[index] = { ...next[index], fileName: e.target.value };
-                    setForm({ ...form, attachments: next });
-                  }}
-                  placeholder="File name"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs text-muted-foreground">
-                  File URL / Uploaded Data
-                </label>
-                <Input
-                  value={
-                    attachment.fileUrl?.startsWith("data:")
-                      ? "Uploaded file ready"
-                      : attachment.fileUrl
-                  }
-                  onChange={(e) => {
-                    const next = [...form.attachments];
-                    next[index] = {
-                      ...next[index],
-                      fileUrl: e.target.value,
-                      isLocal: false,
-                    };
-                    setForm({ ...form, attachments: next });
-                  }}
-                  placeholder="Paste file URL"
-                  disabled={attachment.fileUrl?.startsWith("data:")}
-                />
-                {(attachment.fileType || attachment.fileSize) && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {attachment.fileType || "file"}{" "}
-                    {formatFileSize(attachment.fileSize)
-                      ? `· ${formatFileSize(attachment.fileSize)}`
-                      : ""}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-end gap-2">
-                {attachment.fileUrl && (
-                  <Button
-                    variant="outline"
-                    type="button"
-                    className="flex-1 lg:flex-none"
-                    onClick={() => window.open(attachment.fileUrl, "_blank")}
-                  >
-                    Open
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  type="button"
-                  className="flex-1 text-destructive hover:text-destructive lg:flex-none"
-                  onClick={() =>
-                    setForm({
-                      ...form,
-                      attachments: form.attachments.filter(
-                        (_, i) => i !== index,
-                      ),
-                    })
-                  }
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          type="button"
-          onClick={() =>
-            setForm({
-              ...form,
-              attachments: [
-                ...form.attachments,
-                { fileName: "", fileUrl: "", fileType: "" },
-              ],
-            })
-          }
-        >
-          <Plus className="w-3 h-3 mr-1" /> Add Link Manually
-        </Button>
-      </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6">
@@ -2004,6 +2028,11 @@ export default function WorksPage() {
             setForm={setNewProject}
             loadingState={createLoading}
             mode="create"
+            customers={customers}
+            works={works}
+            employees={employees}
+            employeeWorkload={employeeWorkload}
+            handleFormFileUpload={handleFormFileUpload}
           />
           <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row">
             <Button
@@ -2042,6 +2071,11 @@ export default function WorksPage() {
             setForm={setEditProject}
             loadingState={editLoading}
             mode="edit"
+            customers={customers}
+            works={works}
+            employees={employees}
+            employeeWorkload={employeeWorkload}
+            handleFormFileUpload={handleFormFileUpload}
           />
           <div className="flex flex-col-reverse gap-2 pt-4 sm:flex-row">
             <Button
