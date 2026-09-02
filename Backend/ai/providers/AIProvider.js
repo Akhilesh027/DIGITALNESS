@@ -5,8 +5,12 @@
  */
 
 async function callAIMLAPI({ messages, model = "openai/gpt-4o-mini", temperature = 0.7, jsonMode = false }) {
-  const apiKey = process.env.AIML_API_KEY || "820381797ae35e0aff9276d8ce6a8710";
+  const apiKey = process.env.AIML_API_KEY;
   const baseUrl = process.env.AIML_BASE_URL || "https://api.aimlapi.com/v1";
+
+  if (!apiKey) {
+    throw new Error("AIML_API_KEY is not configured");
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -44,9 +48,13 @@ async function callAIMLAPI({ messages, model = "openai/gpt-4o-mini", temperature
 }
 
 async function callCloudflareWorkersAI({ messages, model = "@cf/meta/llama-3.1-8b-instruct" }) {
-  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || "9fa53370eb61e60d8151ffc809c90fa8";
-  const apiToken = process.env.CLOUDFLARE_API_TOKEN || "cfat_N3Znpqcj6k8PIahkdcTm0yUPDPjeF5p8tZPzLeSu6c904ab9";
+  const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  const apiToken = process.env.CLOUDFLARE_API_TOKEN;
   const cfModel = process.env.CLOUDFLARE_AI_TEXT_MODEL || model || "@cf/meta/llama-3.1-8b-instruct";
+
+  if (!accountId || !apiToken) {
+    throw new Error("Cloudflare account ID or API token is not configured");
+  }
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 15000);
