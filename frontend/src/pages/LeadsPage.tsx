@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Search, Plus, Phone, MessageSquare, Building2, MapPin, Clock, CheckCircle,
   XCircle, PhoneCall, PhoneOff, UserPlus, Flame, Snowflake, Sun, TrendingUp, Loader2,
-  Eye, Pencil, Trash2,
+  Eye, Pencil, Trash2, Mail,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,7 @@ interface Lead {
   id: string;
   name: string;
   contactNumber: string;
+  email?: string;
   businessType: string;
   city: string;
   source: 'Telecaller' | 'Executive' | 'Website' | 'Ad';
@@ -807,6 +808,11 @@ export default function LeadsPage() {
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
                             <Phone className="w-3 h-3" />{lead.contactNumber}
                           </div>
+                          {lead.email && (
+                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <Mail className="w-3 h-3" />{lead.email}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -1046,12 +1052,22 @@ export default function LeadsPage() {
                     >
                       <MessageSquare className="mr-2 h-4 w-4" /> WhatsApp
                     </Button>
+                    {viewLead.email && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`mailto:${viewLead.email}`, "_blank")}
+                      >
+                        <Mail className="mr-2 h-4 w-4" /> Email
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <InfoCard label="Contact Number" value={viewLead.contactNumber} />
+                <InfoCard label="Email" value={viewLead.email || "—"} />
                 <InfoCard label="Branch" value={getBranchName(viewLead.branchId)} />
                 <InfoCard label="Assigned To" value={getEmployeeName(viewLead.assignedTo)} />
                 <InfoCard label="Source" value={viewLead.source || "—"} />

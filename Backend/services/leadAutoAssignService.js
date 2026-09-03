@@ -121,20 +121,31 @@ class LeadAutoAssignService {
     else if (lowerTimeline.includes("later")) normalizedTimeline = "Later";
 
     // 3. Persist Lead to Database
+    const initialNotes = [];
+    if (notes && String(notes).trim()) {
+      initialNotes.push(String(notes).trim());
+    }
+    initialNotes.push(`[Auto-Ingested from ${source}] Lead Score: ${scoring.score} (${scoring.reason})`);
+
+    const reqArray = Array.isArray(requirement)
+      ? requirement.filter(Boolean)
+      : (requirement ? [requirement] : ["Website Inbound"]);
+
     const lead = await Lead.create({
       name: name.trim(),
       contactNumber: finalPhone.trim(),
       email: email ? email.trim().toLowerCase() : "",
       businessType: businessType || "Business",
+      city: city || "",
       leadScore: scoring.score,
       source: normalizedSource,
       timeline: normalizedTimeline,
       budgetRange: budget ? `₹${Number(budget).toLocaleString("en-IN")}` : "₹25,000",
-      requirements: [requirement || notes || "General Inbound"],
+      requirements: reqArray.length > 0 ? reqArray : ["Website Inbound"],
       status: "New",
       assignedTo: assignedRep ? assignedRep._id : null,
       branchId: branchId || "BR001",
-      notes: `[Auto-Ingested from ${source}] Lead Score: ${scoring.score} (${scoring.reason})`,
+      notes: initialNotes,
     });
 
     // 4. Generate Instant Auto-Greeting Communication Record

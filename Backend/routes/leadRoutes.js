@@ -9,6 +9,7 @@ const {
   addCallLog,
   pushToPipeline,
   convertLeadToCustomer,
+  createPublicWebsiteLead,
 } = require("../controllers/leadController.js");
 const { handleInboundWebhook } = require("../controllers/leadWebhookController.js");
 const verifyMetaWebhookSignature = require("../middleware/webhooks/verifyMetaWebhookSignature.js");
@@ -17,7 +18,11 @@ const { protect } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-// Public Webhook for Meta Ads, WhatsApp, Google Ads & Website Lead Capture
+// Public Website & Form Lead Capture (no auth required)
+router.post("/public", createPublicWebsiteLead);
+router.post("/website", createPublicWebsiteLead);
+
+// Public Webhook for Meta Ads, WhatsApp, Google Ads & Lead Capture
 router.get("/webhook/inbound", verifyMetaWebhookSignature);
 router.post("/webhook/inbound", verifyMetaWebhookSignature, handleInboundWebhook);
 

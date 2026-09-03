@@ -807,3 +807,92 @@ exports.deleteLead = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+// ========== CREATE PUBLIC WEBSITE LEAD ==========
+exports.createPublicWebsiteLead = async (req, res) => {
+  try {
+    const {
+      name,
+      contactNumber,
+      phone,
+      email,
+      businessType,
+      requirements,
+      service,
+      message,
+      notes,
+      budget,
+      timeline,
+      city,
+    } = req.body;
+
+    const finalName = (name || "").trim();
+    const finalPhone = (contactNumber || phone || "").trim();
+
+    if (!finalName || !finalPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Name and Phone Number are required to submit an inquiry.",
+      });
+    }
+
+    const leadAutoAssignService = require("../services/leadAutoAssignService");
+
+    const payload = {
+      name: finalName,
+      contactNumber: finalPhone,
+      phone: finalPhone,
+      email: (email || "").trim(),
+      businessType: businessType || (service ? `${service} Inquiry` : "Website Lead"),
+      requirement: service || (Array.isArray(requirements) ? requirements.join(", ") : requirements) || "Website Inquiry",
+      notes: message || notes || "",
+      budget: budget || 0,
+      timeline: timeline || "Normal",
+      source: "Website",
+      city: city || "",
+    };
+
+    const result = await leadAutoAssignService.ingestAndAssignLead(payload);
+    const populatedLead = await populateLead(result.lead._id);
+
+    // Notify connected CRM clients in real-time via Socket.IO
+    try {
+      if (req.app && req.app.get("io")) {
+        const io = req.app.get("io");
+        io.emit("new_lead", populatedLead);
+      }
+    } catch (socketErr) {
+      console.warn("[Socket emit warning]:", socketErr.message);
+    }
+
+    // Send admin email notification
+    try {
+      const adminEmails = await getAdminEmails();
+      if (adminEmails.length) {
+        await sendLeadMail({
+          to: adminEmails.join(","),
+          subject: `New Website Lead: ${populatedLead.name}`,
+          title: "New Website Lead Received",
+          message: `${populatedLead.name} submitted a new inquiry via the website. Service: ${service || "General"}. Phone: ${populatedLead.contactNumber}.`,
+          lead: populatedLead,
+          buttonText: "Open CRM",
+          buttonLink: `${process.env.CLIENT_URL || ""}/leads/${populatedLead._id}`,
+        });
+      }
+    } catch (mailErr) {
+      console.warn("[Email notification warning]:", mailErr.message);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: "Your inquiry has been submitted successfully. Our team will get back to you shortly!",
+      lead: populatedLead,
+    });
+  } catch (error) {
+    console.error("[createPublicWebsiteLead error]:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to submit inquiry",
+    });
+  }
+};
