@@ -318,8 +318,8 @@ export function FloatingAICopilot() {
       {isOpen && (
         <div
           className={`fixed z-50 transition-all duration-300 ease-out flex flex-col bg-slate-950/95 border border-indigo-500/30 shadow-[0_25px_70px_rgba(0,0,0,0.75)] backdrop-blur-2xl ring-1 ring-white/10 overflow-hidden ${isExpanded
-              ? "inset-4 sm:inset-10 md:inset-16 rounded-3xl"
-              : "bottom-24 right-4 sm:right-6 w-[calc(100vw-32px)] sm:w-[440px] md:w-[460px] h-[620px] max-h-[82vh] rounded-2xl"
+            ? "inset-4 sm:inset-10 md:inset-16 rounded-3xl"
+            : "bottom-24 right-4 sm:right-6 w-[calc(100vw-32px)] sm:w-[440px] md:w-[460px] h-[620px] max-h-[82vh] rounded-2xl"
             }`}
         >
           {/* TOP BAR / HEADER */}

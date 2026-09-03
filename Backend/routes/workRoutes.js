@@ -15,6 +15,8 @@ const {
   addWorkAttachment,
   deleteWorkAttachment,
   getWorkAnalytics,
+  approveWork,
+  revisionWork,
 } = require("../controllers/workController.js");
 
 const { protect } = require("../middleware/authMiddleware.js");
@@ -47,6 +49,8 @@ router.delete("/:id/attachments/:attachmentIndex", deleteWorkAttachment);
 
 // Status update / review / approval / revision
 router.put("/:id/status", updateWorkStatus);
+router.put("/:id/approve", approveWork);
+router.put("/:id/revision", revisionWork);
 
 // Assign / reassign work
 router.put("/:id/assign", assignWork);

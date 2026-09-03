@@ -5,14 +5,22 @@ const WorkApproval = require("../models/WorkApproval.js");
 const createNotification = require("../utils/createNotification");
 const sendMail = require("../utils/sendMail");
 
-const ADMIN_ROLES = ["Admin", "admin"];
-const MANAGER_ROLES = ["Operational Manager", "Branch Manager"];
+const ADMIN_ROLES = ["Admin", "admin", "Super Admin", "superadmin", "Owner", "owner"];
+const MANAGER_ROLES = [
+  "Operational Manager",
+  "Branch Manager",
+  "Manager",
+  "manager",
+  "operations manager",
+  "operational manager",
+];
 
 const allowedStatuses = [
   "Pending",
   "Not Started",
   "In Progress",
   "Review",
+  "Approved",
   "Completed",
   "Revision",
   "Failed",
@@ -87,11 +95,28 @@ const populateWork = async (id) => {
 };
 
 const getRoleWorkFilter = async (user) => {
-  if (ADMIN_ROLES.includes(user.role)) return {};
+  const role = String(user?.role || "").trim().toLowerCase();
 
-  if (MANAGER_ROLES.includes(user.role)) {
-    const customers = await Customer.find({ branchId: user.branchId }).distinct("_id");
-    return { customer: { $in: customers } };
+  if (
+    role === "admin" ||
+    role === "super admin" ||
+    role === "superadmin" ||
+    role === "owner"
+  ) {
+    return {};
+  }
+
+  if (
+    role === "operational manager" ||
+    role === "branch manager" ||
+    role === "manager" ||
+    role === "operations manager"
+  ) {
+    if (user.branchId) {
+      const customers = await Customer.find({ branchId: user.branchId }).distinct("_id");
+      return { customer: { $in: customers } };
+    }
+    return {};
   }
 
   return { assignedTo: { $in: [getUserId(user)] } };
@@ -769,19 +794,34 @@ exports.updateWorkStatus = async (req, res) => {
       );
     }
 
-    if (status === "Completed") {
+    if (status === "Completed" || status === "Approved") {
+      work.status = status === "Approved" ? "Approved" : "Completed";
+      work.approvalStatus = "Approved";
       work.approvalRequired = false;
       work.approvedBy = userId;
       work.approvedAt = new Date();
 
       work.timeline.push({
-        title: "Work Completed",
-        description: "Work marked as completed",
+        title: "Work Approved",
+        description: managerReviewNote || "Work approved and marked as completed",
         createdBy: userId,
       });
+
+      await WorkApproval.updateMany(
+        { work: work._id, status: "Pending Approval" },
+        {
+          $set: {
+            status: "Approved",
+            adminRemark: managerReviewNote || "Work approved",
+            reviewedBy: userId,
+            reviewedAt: new Date(),
+          },
+        }
+      );
     }
 
     if (status === "Revision") {
+      work.approvalStatus = "Revision";
       work.approvalRequired = true;
 
       work.timeline.push({
@@ -789,9 +829,23 @@ exports.updateWorkStatus = async (req, res) => {
         description: managerReviewNote || "Revision requested",
         createdBy: userId,
       });
+
+      await WorkApproval.updateMany(
+        { work: work._id, status: "Pending Approval" },
+        {
+          $set: {
+            status: "Revision Requested",
+            adminRemark: managerReviewNote || "Revision requested",
+            reviewedBy: userId,
+            reviewedAt: new Date(),
+          },
+          $inc: { revisionCount: 1 },
+        }
+      );
     }
 
     if (status === "Failed") {
+      work.approvalStatus = "Rejected";
       work.timeline.push({
         title: "Work Failed",
         description: managerReviewNote || "Work marked as failed",
@@ -1136,6 +1190,147 @@ exports.deleteWork = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to delete work",
+      error: error.message,
+    });
+  }
+};
+
+exports.approveWork = async (req, res) => {
+  try {
+    const { adminRemark, managerReviewNote, status = "Completed" } = req.body;
+    const userId = getUserId(req.user);
+    const remark = adminRemark || managerReviewNote || "Work approved";
+
+    const work = await Work.findById(req.params.id);
+    if (!work) {
+      return res.status(404).json({
+        success: false,
+        message: "Work not found",
+      });
+    }
+
+    work.status = status === "Approved" ? "Approved" : "Completed";
+    work.approvalStatus = "Approved";
+    work.approvalRequired = false;
+    work.approvedBy = userId;
+    work.approvedAt = new Date();
+    work.managerReviewNote = remark;
+
+    work.timeline = work.timeline || [];
+    work.timeline.push({
+      title: "Work Approved",
+      description: remark,
+      createdBy: userId,
+    });
+
+    await work.save();
+
+    await WorkApproval.updateMany(
+      { work: work._id, status: "Pending Approval" },
+      {
+        $set: {
+          status: "Approved",
+          adminRemark: remark,
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+        },
+      }
+    );
+
+    await syncCustomerWork(work);
+
+    await notifyMany(work.assignedTo || [], {
+      title: "Work Approved",
+      message: `${work.title} has been approved and marked completed.`,
+      type: "approval",
+      moduleId: work._id,
+      moduleModel: "Work",
+      createdBy: userId,
+      link: "/works",
+    });
+
+    const populatedWork = await populateWork(work._id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Work approved successfully",
+      data: populatedWork,
+    });
+  } catch (error) {
+    console.log("Approve work error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to approve work",
+      error: error.message,
+    });
+  }
+};
+
+exports.revisionWork = async (req, res) => {
+  try {
+    const { adminRemark, managerReviewNote } = req.body;
+    const userId = getUserId(req.user);
+    const remark = adminRemark || managerReviewNote || "Revision requested";
+
+    const work = await Work.findById(req.params.id);
+    if (!work) {
+      return res.status(404).json({
+        success: false,
+        message: "Work not found",
+      });
+    }
+
+    work.status = "Revision";
+    work.approvalStatus = "Revision";
+    work.approvalRequired = true;
+    work.managerReviewNote = remark;
+
+    work.timeline = work.timeline || [];
+    work.timeline.push({
+      title: "Revision Requested",
+      description: remark,
+      createdBy: userId,
+    });
+
+    await work.save();
+
+    await WorkApproval.updateMany(
+      { work: work._id, status: "Pending Approval" },
+      {
+        $set: {
+          status: "Revision Requested",
+          adminRemark: remark,
+          reviewedBy: userId,
+          reviewedAt: new Date(),
+        },
+        $inc: { revisionCount: 1 },
+      }
+    );
+
+    await syncCustomerWork(work);
+
+    await notifyMany(work.assignedTo || [], {
+      title: "Revision Requested",
+      message: `${work.title} requires revision.`,
+      type: "approval",
+      moduleId: work._id,
+      moduleModel: "Work",
+      createdBy: userId,
+      link: "/works",
+    });
+
+    const populatedWork = await populateWork(work._id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Revision requested successfully",
+      data: populatedWork,
+    });
+  } catch (error) {
+    console.log("Revision work error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to request revision",
       error: error.message,
     });
   }

@@ -168,9 +168,22 @@ const workSchema = new mongoose.Schema(
         "Not Started",
         "In Progress",
         "Review",
+        "Approved",
         "Completed",
         "Revision",
         "Failed",
+      ],
+      default: "Pending",
+    },
+
+    approvalStatus: {
+      type: String,
+      enum: [
+        "Pending",
+        "Pending Approval",
+        "Approved",
+        "Revision",
+        "Rejected",
       ],
       default: "Pending",
     },

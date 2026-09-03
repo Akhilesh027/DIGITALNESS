@@ -2,15 +2,15 @@ import { motion } from "framer-motion";
 import Container from "../common/Container";
 
 const partnerLogos = [
-    "https://digitalness.co.in/assets/img/elements/brand-img1.png",
-    "https://digitalness.co.in/assets/img/elements/brand-img2.png",
-    "https://digitalness.co.in/assets/img/elements/brand-img3.png",
-    "https://digitalness.co.in/assets/img/elements/brand-img4.png",
-    "https://digitalness.co.in/assets/img/elements/brand-img5.png",
-    "https://digitalness.co.in/assets/img/elements/brand-img6.png",
-    "https://digitalness.co.in/assets/img/elements/brand-img7.png",
-    "https://digitalness.co.in/assets/img/elements/brand-img8.png",
-    "https://digitalness.co.in/assets/img/elements/brand-img9.png",
+    { name: "Google Partner", src: "/assets/img/elements/brand-img1.svg" },
+    { name: "Meta Business Partner", src: "/assets/img/elements/brand-img2.svg" },
+    { name: "WordPress", src: "/assets/img/elements/brand-img3.svg" },
+    { name: "Shopify Partner", src: "/assets/img/elements/brand-img4.svg" },
+    { name: "HubSpot", src: "/assets/img/elements/brand-img5.svg" },
+    { name: "SEMrush", src: "/assets/img/elements/brand-img6.svg" },
+    { name: "WhatsApp Business", src: "/assets/img/elements/brand-img7.svg" },
+    { name: "Amazon Ads", src: "/assets/img/elements/brand-img8.svg" },
+    { name: "Zoho Partner", src: "/assets/img/elements/brand-img9.svg" },
 ];
 
 const PartnerCompanies = () => {
@@ -46,15 +46,20 @@ const PartnerCompanies = () => {
                             }}
                             className="flex w-max items-center gap-16"
                         >
-                            {logos.map((logo, index) => (
+                            {logos.map((partner, index) => (
                                 <div
-                                    key={`${logo}-${index}`}
-                                    className="flex h-20 w-[180px] shrink-0 items-center justify-center"
+                                    key={`${partner.name}-${index}`}
+                                    className="flex h-20 w-[180px] shrink-0 items-center justify-center rounded-xl bg-white/70 px-4 py-2 shadow-sm backdrop-blur-sm transition duration-300 hover:scale-105 hover:bg-white"
                                 >
                                     <img
-                                        src={logo}
-                                        alt={`Partner company ${index + 1}`}
-                                        className="max-h-12 w-auto object-contain transition duration-300 hover:scale-110"
+                                        src={partner.src}
+                                        alt={partner.name}
+                                        loading="lazy"
+                                        onError={(e) => {
+                                            e.currentTarget.onerror = null;
+                                            e.currentTarget.style.display = "none";
+                                        }}
+                                        className="max-h-12 w-auto object-contain transition duration-300"
                                     />
                                 </div>
                             ))}

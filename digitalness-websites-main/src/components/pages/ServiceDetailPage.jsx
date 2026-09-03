@@ -3,8 +3,6 @@ import { ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { servicesData } from "../../data/servicesPageData";
 
-const bannerBg = "https://digitalness.co.in/assets/img/bg/inner-header.png";
-
 const defaultService = {
     title: "Digitalness Service",
     category: "Services",

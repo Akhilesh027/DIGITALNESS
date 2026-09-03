@@ -473,10 +473,10 @@ export default function CustomerOnboardingPage() {
               key={s.num}
               onClick={() => setStep(s.num)}
               className={`flex items-center gap-2 cursor-pointer p-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors ${isActive
-                  ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
-                  : isDone
-                    ? "text-emerald-700"
-                    : "text-slate-400 hover:text-slate-600"
+                ? "bg-indigo-50 text-indigo-700 border border-indigo-200"
+                : isDone
+                  ? "text-emerald-700"
+                  : "text-slate-400 hover:text-slate-600"
                 }`}
             >
               {isDone ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <Icon className="h-4 w-4" />}

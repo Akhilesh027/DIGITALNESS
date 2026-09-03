@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import teamImage from "/src/assets/team/team.png";
+import teamImage from "../../assets/team/team.png";
 import {
     ArrowUpRight,
     CheckCircle2,

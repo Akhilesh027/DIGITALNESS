@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 80" width="220" height="80">
+  <rect width="220" height="80" rx="16" fill="#064E3B"/>
+  <g transform="translate(18, 20)">
+    <path fill="#34D399" d="M18 4C18 4 6 14 6 24c0 6.6 5.4 12 12 12s12-5.4 12-12c0-10-12-20-12-20z"/>
+    <path fill="#064E3B" d="M18 10v22M18 16l-5 5M18 22l5 5"/>
+  </g>
+  <text x="60" y="38" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="18" font-weight="700" fill="#ECFDF5" letter-spacing="1">VEDA</text>
+  <text x="60" y="53" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#34D399" letter-spacing="2">AYURVEDA WELLNESS</text>
+</svg>

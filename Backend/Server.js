@@ -121,7 +121,7 @@ app.use("/api/work-approvals", workApprovalRoutes);
 app.use("/api/approvals", require("./routes/approvalRoutes.js"));
 app.use("/api/communications", communicationRoutes);
 app.use("/api/clients", clientRoutes);
-app.use("/api/tickets", require("./routes/ticketRoutes.js"));app.use(
+app.use("/api/tickets", require("./routes/ticketRoutes.js")); app.use(
   '/api/templates',
   require('./routes/templateRoutes.js')
 );
@@ -370,7 +370,7 @@ app.all("/api/admin/simulate-lifecycle", async (req, res) => {
         month: new Date().getMonth() + 1,
         year: new Date().getFullYear(),
       });
-    } catch (calErr) {}
+    } catch (calErr) { }
 
     // 6. Refresh Morning Executive Briefing Snapshot
     const briefSnapshot = await executiveBriefingEngine.generateMorningBrief();
@@ -446,7 +446,7 @@ const gracefulShutdown = async (signal) => {
   try {
     const QueueRegistry = require("./ai/queue/QueueRegistry");
     const { closeRedis } = require("./config/redis");
-    
+
     await QueueRegistry.closeAll();
     await closeRedis();
     await mongoose.connection.close();

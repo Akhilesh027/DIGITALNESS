@@ -315,8 +315,8 @@ export default function SchedulerPage() {
               <button
                 onClick={() => setPlatformMock("instagram")}
                 className={`px-2.5 py-1 rounded-md font-semibold transition-all ${platformMock === "instagram"
-                    ? "bg-white text-pink-600 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
+                  ? "bg-white text-pink-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
                   }`}
               >
                 Instagram Mockup
@@ -324,8 +324,8 @@ export default function SchedulerPage() {
               <button
                 onClick={() => setPlatformMock("facebook")}
                 className={`px-2.5 py-1 rounded-md font-semibold transition-all ${platformMock === "facebook"
-                    ? "bg-white text-blue-600 shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
+                  ? "bg-white text-blue-600 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
                   }`}
               >
                 Facebook Mockup

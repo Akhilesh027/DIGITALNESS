@@ -49,6 +49,7 @@ type WorkStatus =
   | "Not Started"
   | "In Progress"
   | "Review"
+  | "Approved"
   | "Completed"
   | "Revision"
   | "Failed";
@@ -136,6 +137,7 @@ const statusColors: Record<string, any> = {
   "Not Started": "secondary",
   "In Progress": "inProgress",
   Review: "info",
+  Approved: "completed",
   Completed: "completed",
   Revision: "warning",
   Failed: "failed",
@@ -153,6 +155,7 @@ const statuses: WorkStatus[] = [
   "Not Started",
   "In Progress",
   "Review",
+  "Approved",
   "Completed",
   "Revision",
   "Failed",
@@ -632,8 +635,14 @@ export default function WorksPage() {
 
   const canAddWork =
     currentUserRole === "admin" ||
+    currentUserRole === "super admin" ||
+    currentUserRole === "superadmin" ||
+    currentUserRole === "owner" ||
+    currentUserRole === "manager" ||
     currentUserRole === "operational manager" ||
-    currentUserRole === "operationalmanager";
+    currentUserRole === "operationalmanager" ||
+    currentUserRole === "branch manager" ||
+    currentUserRole === "operations manager";
 
   const canManageWork = canAddWork;
   const canEditWork = canManageWork;
@@ -979,23 +988,37 @@ export default function WorksPage() {
     try {
       setStatusUpdatingId(projectId);
 
+      const payload: any = { status: newStatus };
+      if (newStatus === "Completed" || newStatus === "Approved") {
+        payload.approvalStatus = "Approved";
+      }
+
       try {
         await axios.put(
           `${API_URL}/works/${projectId}/status`,
-          { status: newStatus },
+          payload,
           getAuthConfig(),
         );
       } catch {
         await axios.put(
           `${API_URL}/works/${projectId}`,
-          { status: newStatus },
+          payload,
           getAuthConfig(),
         );
       }
 
       setWorks((prev) =>
         prev.map((work) =>
-          work.id === projectId ? { ...work, status: newStatus } : work,
+          work.id === projectId
+            ? {
+              ...work,
+              status: newStatus,
+              approvalStatus:
+                newStatus === "Completed" || newStatus === "Approved"
+                  ? "Approved"
+                  : work.approvalStatus,
+            }
+            : work,
         ),
       );
 
@@ -1026,26 +1049,26 @@ export default function WorksPage() {
       try {
         await axios.put(
           `${API_URL}/works/${projectId}/approve`,
-          {},
+          { adminRemark: "Approved", status: "Completed", approvalStatus: "Approved" },
           getAuthConfig(),
         );
       } catch {
         await axios.put(
-          `${API_URL}/works/${projectId}`,
-          { status: "Completed", approvalStatus: "Approved" },
+          `${API_URL}/works/${projectId}/status`,
+          { status: "Completed", approvalStatus: "Approved", managerReviewNote: "Approved" },
           getAuthConfig(),
         );
       }
 
       toast({
         title: "Work Approved",
-        description: "Work marked as completed",
+        description: "Work approved and marked as completed",
       });
       fetchWorks();
-    } catch {
+    } catch (err: any) {
       toast({
         title: "Error",
-        description: "Failed to approve work",
+        description: err?.response?.data?.message || "Failed to approve work",
         variant: "destructive",
       });
     } finally {
@@ -1060,13 +1083,13 @@ export default function WorksPage() {
       try {
         await axios.put(
           `${API_URL}/works/${projectId}/revision`,
-          { status: "Revision" },
+          { adminRemark: "Revision requested", status: "Revision", approvalStatus: "Revision" },
           getAuthConfig(),
         );
       } catch {
         await axios.put(
-          `${API_URL}/works/${projectId}`,
-          { status: "Revision", approvalStatus: "Revision" },
+          `${API_URL}/works/${projectId}/status`,
+          { status: "Revision", approvalStatus: "Revision", managerReviewNote: "Revision requested" },
           getAuthConfig(),
         );
       }
@@ -1076,10 +1099,10 @@ export default function WorksPage() {
         description: "Work moved to revision",
       });
       fetchWorks();
-    } catch {
+    } catch (err: any) {
       toast({
         title: "Error",
-        description: "Failed to request revision",
+        description: err?.response?.data?.message || "Failed to request revision",
         variant: "destructive",
       });
     } finally {
@@ -1787,6 +1810,14 @@ export default function WorksPage() {
                           <Badge variant={statusColors[project.status]}>
                             {project.status}
                           </Badge>
+                          {(project.approvalStatus === "Approved" || project.status === "Approved") && (
+                            <Badge
+                              variant="outline"
+                              className="border-emerald-500/40 text-emerald-600 bg-emerald-500/10 text-xs font-semibold"
+                            >
+                              <CheckCircle2 className="w-3 h-3 mr-1" /> Approved
+                            </Badge>
+                          )}
                           {project.parentWorkId && (
                             <Badge variant="outline">Sub Task</Badge>
                           )}
@@ -1955,14 +1986,24 @@ export default function WorksPage() {
                       </Badge>
                     </td>
                     <td className="p-4">
-                      <Badge variant={statusColors[project.status]}>
-                        {project.status}
-                      </Badge>
-                      {isOverdue(project) && (
-                        <Badge variant="destructive" className="ml-2">
-                          Overdue
+                      <div className="flex flex-col gap-1 items-start">
+                        <Badge variant={statusColors[project.status]}>
+                          {project.status}
                         </Badge>
-                      )}
+                        {(project.approvalStatus === "Approved" || project.status === "Approved") && (
+                          <Badge
+                            variant="outline"
+                            className="border-emerald-500/40 text-emerald-600 bg-emerald-500/10 text-[10px] font-medium py-0 h-4"
+                          >
+                            <CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Approved
+                          </Badge>
+                        )}
+                        {isOverdue(project) && (
+                          <Badge variant="destructive" className="text-[10px]">
+                            Overdue
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     {canSeeAssignment && (
                       <td className="p-4 text-sm text-muted-foreground min-w-[190px]">

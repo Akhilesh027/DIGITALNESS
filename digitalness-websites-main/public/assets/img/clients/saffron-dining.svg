@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 80" width="220" height="80">
+  <rect width="220" height="80" rx="16" fill="#431407"/>
+  <g transform="translate(18, 16)">
+    <circle cx="16" cy="18" r="13" fill="#EA580C" opacity="0.3"/>
+    <path fill="#FDBA74" d="M16 6c-4 5-8 10-8 15 0 4.4 3.6 8 8 8s8-3.6 8-8c0-5-4-10-8-15z"/>
+  </g>
+  <text x="58" y="38" font-family="'Cinzel', Georgia, serif" font-size="18" font-weight="700" fill="#FFEDD5" letter-spacing="1.5">SAFFRON</text>
+  <text x="58" y="53" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#F97316" letter-spacing="2">FINE DINE RESTAURANT</text>
+</svg>

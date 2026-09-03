@@ -1,30 +1,21 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
+import srinivasaFurnitures from "../../assets/clients/SrinivasaFurnitures.png";
 
 const clientLogos = [
-    "https://digitalness.co.in/assets/img/clients/1.png",
-    "https://digitalness.co.in/assets/img/clients/2.png",
-    "https://digitalness.co.in/assets/img/clients/3.png",
-    "https://digitalness.co.in/assets/img/clients/4.png",
-    "/src/assets/clients/SrinivasaFurnitures.png",
-    "https://digitalness.co.in/assets/img/clients/5.png",
-    "https://digitalness.co.in/assets/img/clients/6.png",
-    "https://digitalness.co.in/assets/img/clients/7.png",
-    "https://digitalness.co.in/assets/img/clients/8.png",
-    "https://digitalness.co.in/assets/img/clients/9.png",
-    "https://digitalness.co.in/assets/img/clients/10.png",
-    "https://digitalness.co.in/assets/img/clients/11.png",
-    "https://digitalness.co.in/assets/img/clients/12.png",
-    "https://digitalness.co.in/assets/img/clients/13.png",
-    "https://digitalness.co.in/assets/img/clients/14.png",
-    "https://digitalness.co.in/assets/img/clients/15.png",
-    "https://digitalness.co.in/assets/img/clients/16.png",
-    "https://digitalness.co.in/assets/img/clients/17.png",
-    "https://digitalness.co.in/assets/img/clients/18.png",
-    "https://digitalness.co.in/assets/img/clients/19.png",
-    "https://digitalness.co.in/assets/img/clients/20.png",
-    "https://digitalness.co.in/assets/img/clients/21.png",
+    srinivasaFurnitures,
+    "/assets/img/clients/sri-utsavam.svg",
+    "/assets/img/clients/toni-and-guy.svg",
+    "/assets/img/clients/meenakshi-dental.svg",
+    "/assets/img/clients/royal-grand.svg",
+    "/assets/img/clients/apex-interiors.svg",
+    "/assets/img/clients/veda-ayurveda.svg",
+    "/assets/img/clients/horizon-infra.svg",
+    "/assets/img/clients/sunrise-motors.svg",
+    "/assets/img/clients/saffron-dining.svg",
+    "/assets/img/clients/balaji-jewellers.svg",
+    "/assets/img/clients/prime-fitness.svg",
 ];
 
 const ClientsShowcase = () => {
@@ -95,6 +86,11 @@ const ClientsShowcase = () => {
                                 <img
                                     src={logo}
                                     alt="Digitalness client logo"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                        e.currentTarget.onerror = null;
+                                        e.currentTarget.style.display = "none";
+                                    }}
                                     className="relative z-10 max-h-[115px] max-w-[170px] object-contain opacity-100 transition-all duration-700 ease-out group-hover:max-h-[175px] group-hover:max-w-[255px] group-hover:scale-110"
                                 />
                             </div>

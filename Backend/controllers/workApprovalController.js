@@ -4,8 +4,8 @@ const User = require("../models/User");
 const Customer = require("../models/Customer");
 const createNotification = require("../utils/createNotification");
 
-const ADMIN_ROLES = ["Admin", "admin"];
-const MANAGER_ROLES = ["Operational Manager", "Branch Manager"];
+const ADMIN_ROLES = ["Admin", "admin", "Super Admin", "superadmin", "Owner", "owner"];
+const MANAGER_ROLES = ["Operational Manager", "Branch Manager", "Manager", "manager", "operations manager", "operational manager"];
 
 const getUserId = (user) => user?._id || user?.id || user;
 
@@ -17,7 +17,17 @@ const allowedApprovalStatuses = [
 ];
 
 const canReview = (user) => {
-  return ADMIN_ROLES.includes(user?.role) || MANAGER_ROLES.includes(user?.role);
+  const role = String(user?.role || "").trim().toLowerCase();
+  return [
+    "admin",
+    "super admin",
+    "superadmin",
+    "owner",
+    "manager",
+    "operational manager",
+    "branch manager",
+    "operations manager",
+  ].includes(role);
 };
 
 const populateApprovalQuery = (query) => {
@@ -139,6 +149,7 @@ const applyReviewResult = async ({
 
   if (status === "Approved") {
     work.status = "Completed";
+    work.approvalStatus = "Approved";
     work.approvalRequired = false;
     work.approvedBy = reviewerId;
     work.approvedAt = new Date();
@@ -156,6 +167,7 @@ const applyReviewResult = async ({
     approval.revisionCount = Number(approval.revisionCount || 0) + 1;
 
     work.status = "Revision";
+    work.approvalStatus = "Revision";
     work.approvalRequired = true;
     work.managerReviewNote = adminRemark || "Revision requested";
 
@@ -169,6 +181,7 @@ const applyReviewResult = async ({
 
   if (status === "Rejected") {
     work.status = "Failed";
+    work.approvalStatus = "Rejected";
     work.approvalRequired = false;
     work.managerReviewNote = adminRemark || "Work rejected";
 

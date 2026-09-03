@@ -13,8 +13,6 @@ import { motion } from "framer-motion";
 import Navbar from "../layout/Navbar";
 import Footer from "../layout/Footer";
 
-const bannerBg = "https://digitalness.co.in/assets/img/bg/inner-header.png";
-
 const serviceBlogs = {
     "seo-audits": {
         title: "SEO Audits",

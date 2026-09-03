@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 80" width="220" height="80">
+  <rect width="220" height="80" rx="16" fill="#06053A"/>
+  <g transform="translate(18, 16)">
+    <path fill="#D4AF37" d="M16 2l3.5 7.5L28 11l-6 5.8 1.4 8.2L16 21l-7.4 4 1.4-8.2-6-5.8 8.5-1.5L16 2z"/>
+    <circle cx="16" cy="14" r="3" fill="#06053A"/>
+  </g>
+  <text x="56" y="38" font-family="'Cinzel', Georgia, serif" font-size="17" font-weight="700" fill="#FFFFFF" letter-spacing="1">SRI UTSAVAM</text>
+  <text x="56" y="54" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="9" font-weight="600" fill="#D4AF37" letter-spacing="2">BANQUET &amp; EVENTS</text>
+</svg>

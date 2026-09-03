@@ -14,18 +14,19 @@ import {
     TrendingUp,
     Users,
 } from "lucide-react";
+import srinivasaFurnitures from "../../assets/clients/SrinivasaFurnitures.png";
 
 const clientLogos = [
-    "https://digitalness.co.in/assets/img/clients/1.png",
-    "https://digitalness.co.in/assets/img/clients/2.png",
-    "https://digitalness.co.in/assets/img/clients/3.png",
-    "https://digitalness.co.in/assets/img/clients/4.png",
-    "https://digitalness.co.in/assets/img/clients/5.png",
-    "https://digitalness.co.in/assets/img/clients/6.png",
-    "https://digitalness.co.in/assets/img/clients/7.png",
-    "https://digitalness.co.in/assets/img/clients/8.png",
-    "https://digitalness.co.in/assets/img/clients/9.png",
-    "https://digitalness.co.in/assets/img/clients/10.png",
+    srinivasaFurnitures,
+    "/assets/img/clients/sri-utsavam.svg",
+    "/assets/img/clients/toni-and-guy.svg",
+    "/assets/img/clients/meenakshi-dental.svg",
+    "/assets/img/clients/royal-grand.svg",
+    "/assets/img/clients/apex-interiors.svg",
+    "/assets/img/clients/veda-ayurveda.svg",
+    "/assets/img/clients/horizon-infra.svg",
+    "/assets/img/clients/sunrise-motors.svg",
+    "/assets/img/clients/saffron-dining.svg",
 ];
 
 const storySlides = [
@@ -316,6 +317,11 @@ const DigitalnessAboutStory = () => {
                                             <img
                                                 src={logo}
                                                 alt="Digitalness client logo"
+                                                loading="lazy"
+                                                onError={(e) => {
+                                                    e.currentTarget.onerror = null;
+                                                    e.currentTarget.style.display = "none";
+                                                }}
                                                 className="max-h-16 max-w-full object-contain opacity-100"
                                             />
                                         </div>

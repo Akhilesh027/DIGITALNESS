@@ -1155,10 +1155,10 @@ function AgentReadinessPanel({ customerId }: { customerId: string }) {
                 <div className="flex items-center gap-1 mt-1">
                   <span
                     className={`font-bold text-sm ${item.ready
-                        ? "text-emerald-600"
-                        : item.score >= 50
-                          ? "text-amber-600"
-                          : "text-rose-600"
+                      ? "text-emerald-600"
+                      : item.score >= 50
+                        ? "text-amber-600"
+                        : "text-rose-600"
                       }`}
                   >
                     {item.score}%

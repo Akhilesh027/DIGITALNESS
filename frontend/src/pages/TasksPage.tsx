@@ -40,6 +40,7 @@ type TaskStatus =
   | "Not Started"
   | "In Progress"
   | "Review"
+  | "Approved"
   | "Completed"
   | "Revision"
   | "Failed";
@@ -49,6 +50,7 @@ const STATUSES: TaskStatus[] = [
   "Not Started",
   "In Progress",
   "Review",
+  "Approved",
   "Completed",
   "Revision",
   "Failed",
@@ -74,6 +76,7 @@ const statusVariant: Record<string, string> = {
   "Not Started": "secondary",
   "In Progress": "inProgress",
   Review: "info",
+  Approved: "completed",
   Completed: "completed",
   Revision: "warning",
   Failed: "destructive",
@@ -190,12 +193,16 @@ export default function TasksPage() {
     slaDays: 2,
   });
 
-  const role = currentUser?.role;
+  const userRole = String(currentUser?.role || "").trim().toLowerCase();
   const isAdminOrManager =
-    role === "Admin" ||
-    role === "admin" ||
-    role === "Manager" ||
-    role === "Operational Manager";
+    userRole === "admin" ||
+    userRole === "super admin" ||
+    userRole === "superadmin" ||
+    userRole === "owner" ||
+    userRole === "manager" ||
+    userRole === "operational manager" ||
+    userRole === "branch manager" ||
+    userRole === "operations manager";
 
   const isEmployee = !isAdminOrManager;
 
@@ -253,6 +260,11 @@ export default function TasksPage() {
       deadline: work.dueDate || work.deadline,
       dueDate: work.dueDate || work.deadline,
       status: work.status || "Pending",
+      approvalStatus:
+        work.approvalStatus ||
+        (work.status === "Completed" || work.status === "Approved"
+          ? "Approved"
+          : "Pending"),
       progressNote: work.progressNote || "",
       attachments: work.attachments || [],
       timeSpent: work.timeSpent || 0,
@@ -346,7 +358,9 @@ export default function TasksPage() {
     pending: visible.filter((t) => t.status === "Pending").length,
     ongoing: visible.filter((t) => t.status === "In Progress").length,
     review: visible.filter((t) => t.status === "Review").length,
-    completed: visible.filter((t) => t.status === "Completed").length,
+    completed: visible.filter(
+      (t) => t.status === "Completed" || t.status === "Approved"
+    ).length,
   };
 
   const empName = (id?: string, fallback?: string) => {
@@ -510,28 +524,63 @@ export default function TasksPage() {
   const handleStatus = async (status: TaskStatus) => {
     if (!selected) return;
 
-    if (isEmployee && status !== "Review" && status !== "In Progress") {
-      toast.error("Employees can only start work or submit for review");
-      return;
+    let targetStatus = status;
+    if (isEmployee) {
+      if (status === "Completed") {
+        targetStatus = "Review";
+        toast.info("Task completed and submitted for manager/admin review");
+      } else if (status !== "Review" && status !== "In Progress") {
+        toast.error("Employees can only start work or submit for review");
+        return;
+      }
     }
 
     try {
-      setStatusLoading(status);
+      setStatusLoading(targetStatus);
 
-      await axios.put(
-        `${API_URL}/works/${selected.id}/status`,
-        { status },
-        getAuthConfig()
-      );
+      const payload: any = { status: targetStatus };
+      if (targetStatus === "Completed" || targetStatus === "Approved") {
+        payload.approvalStatus = "Approved";
+      }
 
-      const updated = { ...selected, status };
+      let apiUpdated: any = null;
+      try {
+        const res = await axios.put(
+          `${API_URL}/works/${selected.id}/status`,
+          payload,
+          getAuthConfig()
+        );
+        apiUpdated = res.data?.data || res.data?.work;
+      } catch {
+        const res = await axios.put(
+          `${API_URL}/works/${selected.id}`,
+          payload,
+          getAuthConfig()
+        );
+        apiUpdated = res.data?.data || res.data?.work;
+      }
+
+      const updated = apiUpdated?._id
+        ? formatWork(apiUpdated)
+        : {
+          ...selected,
+          status: targetStatus,
+          approvalStatus:
+            targetStatus === "Completed" || targetStatus === "Approved"
+              ? "Approved"
+              : selected.approvalStatus,
+        };
 
       setTasks((prev) =>
         prev.map((task) => (task.id === selected.id ? updated : task))
       );
 
       setSelected(updated);
-      toast.success(`Status changed to ${status}`);
+      toast.success(
+        targetStatus === "Completed" || targetStatus === "Approved"
+          ? "Status changed to Approved & Completed"
+          : `Status changed to ${targetStatus}`
+      );
     } catch {
       toast.error("Failed to update status");
     } finally {
@@ -545,17 +594,50 @@ export default function TasksPage() {
     try {
       setReviewLoading(status);
 
-      await axios.put(
-        `${API_URL}/works/${selected.id}/status`,
-        { status },
-        getAuthConfig()
-      );
+      const isApprove = status === "Completed";
+      const targetStatus = isApprove ? "Completed" : "Revision";
+      const targetApprovalStatus = isApprove ? "Approved" : "Revision";
+      const remark = reviewNote.trim();
 
-      const updated = {
-        ...selected,
-        status,
-        managerReviewNote: reviewNote,
-      };
+      let apiUpdated: any = null;
+
+      try {
+        if (isApprove) {
+          const res = await axios.put(
+            `${API_URL}/works/${selected.id}/approve`,
+            { adminRemark: remark, managerReviewNote: remark, status: "Completed" },
+            getAuthConfig()
+          );
+          apiUpdated = res.data?.data || res.data?.work;
+        } else {
+          const res = await axios.put(
+            `${API_URL}/works/${selected.id}/revision`,
+            { adminRemark: remark, managerReviewNote: remark, status: "Revision" },
+            getAuthConfig()
+          );
+          apiUpdated = res.data?.data || res.data?.work;
+        }
+      } catch {
+        const res = await axios.put(
+          `${API_URL}/works/${selected.id}/status`,
+          {
+            status: targetStatus,
+            approvalStatus: targetApprovalStatus,
+            managerReviewNote: remark,
+          },
+          getAuthConfig()
+        );
+        apiUpdated = res.data?.data || res.data?.work;
+      }
+
+      const updated = apiUpdated?._id
+        ? formatWork(apiUpdated)
+        : {
+          ...selected,
+          status: targetStatus,
+          approvalStatus: targetApprovalStatus,
+          managerReviewNote: remark || selected.managerReviewNote,
+        };
 
       setTasks((prev) =>
         prev.map((task) => (task.id === selected.id ? updated : task))
@@ -564,9 +646,13 @@ export default function TasksPage() {
       setSelected(updated);
       setReviewNote("");
 
-      toast.success(status === "Completed" ? "Task approved" : "Revision requested");
-    } catch {
-      toast.error("Failed to submit review");
+      toast.success(
+        isApprove
+          ? "Task approved and marked as completed!"
+          : "Revision requested!"
+      );
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to submit review");
     } finally {
       setReviewLoading(null);
     }
@@ -818,9 +904,19 @@ export default function TasksPage() {
                       </td>
 
                       <td className="p-3">
-                        <Badge variant={statusVariant[t.status] as any}>
-                          {t.status}
-                        </Badge>
+                        <div className="flex flex-col gap-1 items-start">
+                          <Badge variant={statusVariant[t.status] as any}>
+                            {t.status}
+                          </Badge>
+                          {(t.approvalStatus === "Approved" || t.status === "Approved") && (
+                            <Badge
+                              variant="outline"
+                              className="border-emerald-500/40 text-emerald-600 bg-emerald-500/10 text-[10px] font-medium py-0 h-4"
+                            >
+                              <CheckCircle2 className="w-2.5 h-2.5 mr-1" /> Approved
+                            </Badge>
+                          )}
+                        </div>
                       </td>
 
                       <td className="p-3">
@@ -839,10 +935,12 @@ export default function TasksPage() {
                               <AlertTriangle className="w-3 h-3 mr-1" />
                               Overdue {Math.abs(days)}d
                             </Badge>
-                          ) : t.status === "Completed" ? (
+                          ) : t.status === "Completed" || t.status === "Approved" || t.approvalStatus === "Approved" ? (
                             <Badge variant="completed" className="text-[10px]">
                               <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Done
+                              {t.approvalStatus === "Approved" || t.status === "Approved"
+                                ? "Approved & Completed"
+                                : "Done"}
                             </Badge>
                           ) : (
                             <span className="text-[11px] text-muted-foreground flex items-center gap-1">
@@ -1036,7 +1134,22 @@ export default function TasksPage() {
           {selected && (
             <>
               <DialogHeader>
-                <DialogTitle>{selected.title}</DialogTitle>
+                <div className="flex flex-wrap items-center justify-between gap-2 pr-6">
+                  <DialogTitle className="text-xl font-bold">{selected.title}</DialogTitle>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={(statusVariant[selected.status] || "secondary") as any}>
+                      {selected.status}
+                    </Badge>
+                    {(selected.approvalStatus === "Approved" || selected.status === "Approved") && (
+                      <Badge
+                        variant="outline"
+                        className="border-emerald-500/40 text-emerald-600 bg-emerald-500/10 text-xs font-semibold"
+                      >
+                        <CheckCircle2 className="w-3 h-3 mr-1" /> Approved
+                      </Badge>
+                    )}
+                  </div>
+                </div>
               </DialogHeader>
 
               <div className="space-y-4">
@@ -1128,6 +1241,11 @@ export default function TasksPage() {
                           <>
                             <Send className="w-3 h-3 mr-1" />
                             Submit Review
+                          </>
+                        ) : s === "Approved" ? (
+                          <>
+                            <CheckCircle2 className="w-3 h-3 mr-1" />
+                            Approve
                           </>
                         ) : (
                           s
