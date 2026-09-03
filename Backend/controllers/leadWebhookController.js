@@ -52,6 +52,7 @@ function normalizeStandardPayload(body) {
     timeline: body.timeline || body.urgency || "Normal",
     source: body.source || body.leadSource || "Website Form Webhook",
     notes: body.notes || body.message || "",
+    city: body.city || body.location || "",
     branchId: body.branchId || "BR001",
     adCampaignId: body.adCampaignId || body.campaignId,
     utm_source: body.utm_source || body.source,

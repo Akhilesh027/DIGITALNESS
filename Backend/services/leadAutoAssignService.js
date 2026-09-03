@@ -91,6 +91,7 @@ class LeadAutoAssignService {
     contactNumber,
     email,
     businessType,
+    city = "",
     requirement,
     budget,
     timeline,
