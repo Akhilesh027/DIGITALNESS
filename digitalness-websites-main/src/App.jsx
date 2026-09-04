@@ -2,9 +2,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./Home";
 import "./index.css";
 
+import ScrollToTop from "./components/common/ScrollToTop";
+import StickyActions from "./components/common/StickyActions";
 
 import ApplicationForm from "./components/sections/ApplicationForm";
-
 import SubCategoryPage from "./components/pages/SubCategoryPage";
 import BlogDetailPage from "./components/pages/BlogDetailPage";
 import ContactUsForm from "./components/sections/ContactUsForm";
@@ -26,13 +27,18 @@ import SeoAnalyzer from "./components/pages/more/SeoAnalyzer";
 import FreeKeywordTool from "./components/pages/more/FreeKeywordTool";
 import FixYourFunnel from "./components/pages/more/FixYourFunnel";
 
+import PrivacyPolicyPage from "./components/pages/more/PrivacyPolicyPage";
+import TermsConditionsPage from "./components/pages/more/TermsConditionsPage";
+import SitemapPage from "./components/pages/more/SitemapPage";
+import FreeSeoToolsPage from "./components/pages/more/FreeSeoToolsPage";
+
 const App = () => {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<Home />} />
 
-        
         <Route path="/contact" element={<ContactInfoForm />} />
         <Route path="/apply-now" element={<ApplicationForm />} />
 
@@ -53,10 +59,19 @@ const App = () => {
         <Route path="/social-media-pricing" element={<SocialMediaPricing />} />
 
         <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blogs" element={<BlogPage />} />
         <Route path="/seo-analyzer" element={<SeoAnalyzer />} />
         <Route path="/free-keyword-tool" element={<FreeKeywordTool />} />
         <Route path="/fix-your-funnel" element={<FixYourFunnel />} />
+
+        <Route path="/free-seo-tools" element={<FreeSeoToolsPage />} />
+        <Route path="/sitemap" element={<SitemapPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsConditionsPage />} />
+        <Route path="/terms-and-conditions" element={<TermsConditionsPage />} />
       </Routes>
+      <StickyActions />
     </BrowserRouter>
   );
 };

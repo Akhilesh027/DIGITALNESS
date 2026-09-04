@@ -143,6 +143,7 @@ const menuData = [
         ctaTitle: "Explore Our Diverse Services",
         ctaText: "Complete digital, communication, print and marketing solutions for your business.",
         ctaButton: "Get Started",
+        ctaLink: "/contact",
     },
     {
         label: "More",
@@ -155,6 +156,7 @@ const menuData = [
         ctaTitle: "#1 Best Place to Work in Hyderabad..!",
         ctaText: "Join our team",
         ctaButton: "View Careers",
+        ctaLink: "/careers",
     },
 ];
 
@@ -167,17 +169,17 @@ const specialRoutes = {
     "Contact Info": "/contact",
 
     "Company Values": "/company-values",
-    Facebook: "https://facebook.com",
-    Instagram: "https://instagram.com",
-    LinkedIn: "https://linkedin.com",
-    YouTube: "https://youtube.com",
+    Facebook: "https://www.facebook.com/photo/?fbid=151040567671098&set=a.129287479846407&__tn__=%3C4",
+    Instagram: "https://www.instagram.com/digitalness.co.in?igsi=ZGJnYWd6Zm93NDN1",
+    LinkedIn: "https://www.linkedin.com/company/digitalnesscoin/",
+    YouTube: "https://www.youtube.com/@digitalnesscoin",
 
     "Website Cost": "/website-cost",
     "PPC Cost": "/ppc-cost",
     "Google Ads Cost": "/google-ads-cost",
     "Social Media Pricing": "/social-media-pricing",
 
-    "Our Blog": "/blog",
+    "Our Blog": "/blogs",
     "SEO Analyzer": "/seo-analyzer",
     "Free Keyword Suggestion Tool": "/free-keyword-tool",
     "Fix Your Funnel": "/fix-your-funnel",
@@ -256,20 +258,42 @@ const Navbar = () => {
                                                     </h3>
 
                                                     <div className="space-y-1.5">
-                                                        {column.links.map((link) => (
-                                                            <Link
-                                                                key={link}
-                                                                to={getMenuPath(link)}
-                                                                onClick={() => setActiveMenu(null)}
-                                                                className="group flex min-h-[40px] items-center justify-between gap-3 rounded-xl px-2 py-2 text-[14px] font-medium leading-snug text-[#1f2937] transition-all duration-200 hover:bg-[#edeafb] hover:pl-3 hover:text-[#06053a]"
-                                                            >
-                                                                <span className="flex-1">{link}</span>
+                                                        {column.links.map((link) => {
+                                                            const path = getMenuPath(link);
+                                                            const isExternal = path.startsWith("http");
 
-                                                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#06053a] opacity-0 transition group-hover:opacity-100">
-                                                                    <ArrowUpRight size={14} strokeWidth={2.5} />
-                                                                </span>
-                                                            </Link>
-                                                        ))}
+                                                            if (isExternal) {
+                                                                return (
+                                                                    <a
+                                                                        key={link}
+                                                                        href={path}
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                        onClick={() => setActiveMenu(null)}
+                                                                        className="group flex min-h-[40px] items-center justify-between gap-3 rounded-xl px-2 py-2 text-[14px] font-medium leading-snug text-[#1f2937] transition-all duration-200 hover:bg-[#edeafb] hover:pl-3 hover:text-[#06053a]"
+                                                                    >
+                                                                        <span className="flex-1">{link}</span>
+                                                                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#06053a] opacity-0 transition group-hover:opacity-100">
+                                                                            <ArrowUpRight size={14} strokeWidth={2.5} />
+                                                                        </span>
+                                                                    </a>
+                                                                );
+                                                            }
+
+                                                            return (
+                                                                <Link
+                                                                    key={link}
+                                                                    to={path}
+                                                                    onClick={() => setActiveMenu(null)}
+                                                                    className="group flex min-h-[40px] items-center justify-between gap-3 rounded-xl px-2 py-2 text-[14px] font-medium leading-snug text-[#1f2937] transition-all duration-200 hover:bg-[#edeafb] hover:pl-3 hover:text-[#06053a]"
+                                                                >
+                                                                    <span className="flex-1">{link}</span>
+                                                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#06053a] opacity-0 transition group-hover:opacity-100">
+                                                                        <ArrowUpRight size={14} strokeWidth={2.5} />
+                                                                    </span>
+                                                                </Link>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </div>
                                             );
@@ -283,7 +307,11 @@ const Navbar = () => {
                                                     <h4 className="text-[17px] font-bold">{activeData.ctaTitle}</h4>
                                                     <p className="text-sm font-medium">{activeData.ctaText}</p>
                                                 </div>
-                                                <Link to="/contact" className="flex items-center gap-3 rounded-full border border-white/40 py-2 pl-5 pr-2 font-bold">
+                                                <Link
+                                                    to={activeData.ctaLink || "/contact"}
+                                                    onClick={() => setActiveMenu(null)}
+                                                    className="flex items-center gap-3 rounded-full border border-white/40 py-2 pl-5 pr-2 font-bold hover:bg-white/10 transition-colors"
+                                                >
                                                     {activeData.ctaButton}
                                                     <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#06053a]">
                                                         <ArrowUpRight size={18} />
@@ -329,19 +357,39 @@ const Navbar = () => {
 
                                     <div className="px-5 pb-4">
                                         {menu.columns.map((column) => (
-                                            <div key={column.title} className="mb-4">
+                                             <div key={column.title} className="mb-4">
                                                 <h4 className="mb-2 text-sm font-bold text-[#06053a]">{column.title}</h4>
                                                 <div className="space-y-1">
-                                                    {column.links.map((link) => (
-                                                        <Link
-                                                            key={link}
-                                                            to={getMenuPath(link)}
-                                                            onClick={() => setMobileOpen(false)}
-                                                            className="block rounded-lg px-3 py-2 text-[13px] font-medium text-[#374151] hover:bg-[#edeafb] hover:text-[#06053a]"
-                                                        >
-                                                            {link}
-                                                        </Link>
-                                                    ))}
+                                                    {column.links.map((link) => {
+                                                        const path = getMenuPath(link);
+                                                        const isExternal = path.startsWith("http");
+
+                                                        if (isExternal) {
+                                                            return (
+                                                                <a
+                                                                    key={link}
+                                                                    href={path}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    onClick={() => setMobileOpen(false)}
+                                                                    className="block rounded-lg px-3 py-2 text-[13px] font-medium text-[#374151] hover:bg-[#edeafb] hover:text-[#06053a]"
+                                                                >
+                                                                    {link}
+                                                                </a>
+                                                            );
+                                                        }
+
+                                                        return (
+                                                            <Link
+                                                                key={link}
+                                                                to={path}
+                                                                onClick={() => setMobileOpen(false)}
+                                                                className="block rounded-lg px-3 py-2 text-[13px] font-medium text-[#374151] hover:bg-[#edeafb] hover:text-[#06053a]"
+                                                            >
+                                                                {link}
+                                                            </Link>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         ))}
@@ -350,16 +398,29 @@ const Navbar = () => {
                             ))}
                         </div>
 
-                        <Link
-                            to="/apply-now"
-                            onClick={() => setMobileOpen(false)}
-                            className="mt-8 inline-flex items-center gap-3 rounded-lg bg-[#06053a] px-6 py-3 text-lg font-bold text-white"
-                        >
-                            Career
-                            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#06053a]">
-                                <ArrowUpRight size={20} />
-                            </span>
-                        </Link>
+                        <div className="mt-8 flex flex-col gap-3">
+                            <Link
+                                to="/contact"
+                                onClick={() => setMobileOpen(false)}
+                                className="inline-flex items-center justify-between rounded-xl bg-[#06053a] px-6 py-3 text-base font-bold text-white shadow-md hover:bg-[#120b84] transition-colors"
+                            >
+                                Get Started
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#06053a]">
+                                    <ArrowUpRight size={18} />
+                                </span>
+                            </Link>
+
+                            <Link
+                                to="/careers"
+                                onClick={() => setMobileOpen(false)}
+                                className="inline-flex items-center justify-between rounded-xl border-2 border-[#06053a] px-6 py-3 text-base font-bold text-[#06053a] hover:bg-[#06053a]/5 transition-colors"
+                            >
+                                View Careers
+                                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#06053a] text-white">
+                                    <ArrowUpRight size={18} />
+                                </span>
+                            </Link>
+                        </div>
 
                         <div className="mt-8 space-y-6 text-[#06053a]">
                             <div>

@@ -12,8 +12,6 @@ import BlogPosts from "./components/sections/BlogPosts";
 import ClientsShowcase from "./components/sections/ClientsShowcase";
 import Testimonials from "./components/sections/Testimonials";
 import ContactUsForm from "./components/sections/ContactUsForm";
-import StickyActions from "./components/common/StickyActions";
-
 
 const Home = () => {
     return (
@@ -33,7 +31,6 @@ const Home = () => {
                 <ContactCTA />
             </main>
             <Footer />
-            <StickyActions />
         </>
     );
 };

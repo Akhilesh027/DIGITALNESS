@@ -1,10 +1,52 @@
+import { useState, useEffect } from "react";
 import { FaWhatsapp } from "react-icons/fa";
-import { ArrowDownToLine, FileText } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 
 const StickyActions = () => {
+    const [showScrollTop, setShowScrollTop] = useState(false);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            if (window.scrollY > 250) {
+                setShowScrollTop(true);
+            } else {
+                setShowScrollTop(false);
+            }
+        };
+
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        handleScroll();
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
+
+    const scrollToTop = () => {
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth",
+        });
+    };
+
     return (
         <>
-            {/* Download Portfolio */}
+            {/* Scroll to Top Floating Button */}
+            {showScrollTop && (
+                <button
+                    onClick={scrollToTop}
+                    aria-label="Scroll to Top"
+                    className="
+                        fixed bottom-24 right-6 z-[60]
+                        flex h-12 w-12 items-center justify-center
+                        rounded-full bg-[#06053A] text-white
+                        border border-white/20
+                        shadow-[0_10px_25px_rgba(6,5,58,0.4)]
+                        transition-all duration-300 hover:scale-110 hover:bg-[#15126d]
+                        cursor-pointer animate-fade-in
+                    "
+                >
+                    <ArrowUp className="w-5 h-5" />
+                </button>
+            )}
+
             {/* Download Portfolio */}
             <a
                 href="/Digitalness-Portfolio.pdf"
