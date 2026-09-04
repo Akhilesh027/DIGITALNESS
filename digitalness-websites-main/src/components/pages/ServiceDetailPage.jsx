@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { servicesData } from "../../data/servicesPageData";
+import bannerBg from "../../assets/our-services-banner.png";
 
 const defaultService = {
     title: "Digitalness Service",

@@ -12,6 +12,7 @@ import {
 import { motion } from "framer-motion";
 import Navbar from "../layout/Navbar";
 import Footer from "../layout/Footer";
+import bannerBg from "../../assets/our-services-banner.png";
 
 const serviceBlogs = {
     "seo-audits": {
