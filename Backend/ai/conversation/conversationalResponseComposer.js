@@ -210,11 +210,50 @@ Here is your complete executive operations breakdown:`;
         ? `All bottlenecks are cleared! There are currently zero decisions waiting on you.`
         : `You have ${count} pending decisions requiring manager authorization.`;
     }
+    if (command?.includes("reminder")) {
+      const time = result?.timeLabel || "at the scheduled time";
+      const msg = result?.reminderMessage || "Follow-up reminder set.";
+      const client = result?.clientName ? ` for **${result.clientName}**` : "";
+      return `⏰ **Intelligent Reminder Scheduled Successfully!**\n\n` +
+        `• 📅 **Alert Time**: ${time}\n` +
+        `• 📝 **Reminder Note**: "${msg}"${client}\n` +
+        `• 🔔 **Delivery Route**: Notification Center & In-App Alert Popup\n\n` +
+        `✅ I will notify you promptly when this follow-up is due.`;
+    }
     if (command?.startsWith("sla.")) {
-      const count = result?.tasks?.length || result?.length || 0;
-      return count === 0
-        ? `All client deliverables are on track with zero critical SLA breaches.`
-        : `Detected ${count} deliverables with elevated SLA risk.`;
+      const count = result?.tasks?.length || result?.count || 0;
+      const compRate = result?.complianceRate ?? 100;
+      const health = result?.healthStatus || (compRate >= 90 ? "EXCELLENT" : "CRITICAL_ATTENTION");
+      const overdue = result?.overdueCount ?? 0;
+      const tasks = result?.tasks || [];
+
+      let md = `🛡️ **SLAGuardian Executive Health Dossier**\n\n` +
+        `• ⚡ **Overall SLA Compliance**: **${compRate}%** (${health})\n` +
+        `• 🔴 **Overdue / Critical Breaches**: ${overdue} item(s)\n` +
+        `• 📋 **Deliverables Scanned**: ${result?.totalActive || count} active tasks\n\n`;
+
+      if (tasks.length === 0) {
+        md += `🎉 **Zero SLA Breaches!** All active agency deliverables are progressing on track.`;
+        return md;
+      }
+
+      md += `**🚨 High-Priority / At-Risk Deliverables:**\n\n`;
+      tasks.slice(0, 8).forEach((t, idx) => {
+        const client = t.formattedClientName || t.customer?.name || "General Client";
+        const assignee = t.assigneeName || (t.assignedTo?.[0]?.name) || "Unassigned";
+        const badge = t.computedSlaBadge || (t.isOverdue ? "🔴 OVERDUE" : "🟡 AT RISK");
+        const priority = t.priority || "Medium";
+        const timeInfo = t.computedTimeStatus || (t.dueDate ? new Date(t.dueDate).toLocaleDateString("en-IN") : "No Due Date");
+
+        md += `**${idx + 1}. ${t.title}** (${t.workType || "Deliverable"})\n`;
+        md += `• 🏢 **Client**: ${client}\n`;
+        md += `• 👤 **Assigned To**: ${assignee} (${t.assigneeRole || "Team"})\n`;
+        md += `• ⏰ **Timeline**: ${timeInfo} • Priority: ${priority}\n`;
+        md += `• 🛡️ **Status**: ${badge}\n\n`;
+      });
+
+      md += `💡 **Recommended Action**: Rebalance overloaded assignees or extend client delivery deadlines where necessary.`;
+      return md.trim();
     }
     if (command?.startsWith("client.get360") || command?.startsWith("client.getReadiness")) {
       const name = result?.customer?.name || customerName || "Client";
@@ -302,9 +341,34 @@ Here is your complete executive operations breakdown:`;
         ? "scheduled for tomorrow"
         : result?.isToday
         ? "scheduled for today"
+        : result?.isOverdue
+        ? "currently OVERDUE"
         : "in the CRM ledger";
-      const customerLabel = result?.customerName ? ` for ${result.customerName}` : "";
-      return `Here are your ${count} ${statusLabel}tasks${customerLabel} ${timeLabel}:`;
+      const customerLabel = result?.customerName ? ` for **${result.customerName}**` : "";
+      const tasks = result?.tasks || [];
+
+      if (tasks.length === 0) {
+        return `📋 No ${statusLabel}tasks${customerLabel} found ${timeLabel}. Everything is up to date!`;
+      }
+
+      let md = `📋 **Found ${count} ${statusLabel}tasks${customerLabel} ${timeLabel}:**\n\n`;
+      tasks.slice(0, 10).forEach((t, idx) => {
+        const client = t.formattedClientName || t.customer?.name || "Client";
+        const assignee = t.assigneeName || (t.assignedTo?.[0]?.name) || "Unassigned";
+        const badge = t.computedSlaBadge || "🟢 On Track";
+        const timeInfo = t.computedTimeStatus || (t.dueDate ? new Date(t.dueDate).toLocaleDateString("en-IN") : "No deadline");
+        const status = t.status || "Pending";
+
+        md += `**${idx + 1}. ${t.title}** (${t.workType || "Task"})\n`;
+        md += `• 🏢 **Client**: ${client} • 👤 **Assignee**: ${assignee}\n`;
+        md += `• ⏰ **Deadline**: ${timeInfo} • **Status**: ${status} (${badge})\n\n`;
+      });
+
+      if (tasks.length > 10) {
+        md += `_...and ${tasks.length - 10} more tasks in the CRM work ledger._\n`;
+      }
+
+      return md.trim();
     }
     if (command?.includes("task.update") || command?.includes("task.create") || command?.includes("task.assign")) {
       return `✓ Task updated and synced in the CRM work ledger.`;

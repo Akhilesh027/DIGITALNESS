@@ -122,8 +122,16 @@ exports.classifyUniversalIntent = (prompt = "") => {
     return { intent: "BRIEFING_GET_MORNING", command: "briefing.getMorningBrief", confidence: 0.98, category: "GENERAL" };
   }
 
+  // 1.55. Reminders & Alerts
+  if (p.includes("remind") || p.includes("reminder") || (p.includes("alert me") && !p.includes("sla"))) {
+    return { intent: "REMINDER_CREATE", command: "reminder.create", confidence: 0.99, category: "TASK" };
+  }
+
   // 1.6. SLA Guardian & Deadline Risk (Phase 5D)
-  if (p.includes("sla") || p.includes("at risk") || p.includes("critical deliverable") || p.includes("deadline risk")) {
+  if (p.includes("sla") || p.includes("at risk") || p.includes("critical deliverable") || p.includes("deadline risk") || p.includes("sla compliance") || p.includes("sla score") || p.includes("sla health")) {
+    if (p.includes("summary") || p.includes("score") || p.includes("compliance") || p.includes("health") || p.includes("overview") || p.includes("report")) {
+      return { intent: "SLA_GET_SUMMARY", command: "sla.getSummary", confidence: 0.98, category: "TASK" };
+    }
     return { intent: "SLA_GET_CRITICAL", command: "sla.getCritical", confidence: 0.96, category: "TASK" };
   }
 
@@ -461,7 +469,7 @@ exports.parseCommandRequest = async ({ prompt = "", userRole = "Manager", explic
   }
 
   // 3. Parameter Extraction based on command
-  const rawParams = { ...explicitHints };
+  const rawParams = { prompt, text: prompt, ...explicitHints };
 
   // Money amount extraction
   const extractedAmount = extractAmount(prompt);
@@ -478,7 +486,7 @@ exports.parseCommandRequest = async ({ prompt = "", userRole = "Manager", explic
     rawParams.paymentDate = extractedDate;
   }
 
-  if (/to+m+o+r+o+w/i.test(prompt)) {
+  if (/to+m+o+r+r?o+w/i.test(prompt)) {
     rawParams.isTomorrow = true;
     rawParams.timeframe = "TOMORROW";
   } else if (prompt.toLowerCase().includes("today")) {
@@ -487,6 +495,12 @@ exports.parseCommandRequest = async ({ prompt = "", userRole = "Manager", explic
   }
 
   const lowPrompt = prompt.toLowerCase();
+  if (lowPrompt.includes("overdue")) {
+    rawParams.isOverdue = true;
+  }
+  if (lowPrompt.includes("at risk") || lowPrompt.includes("delayed")) {
+    rawParams.isAtRisk = true;
+  }
   if (lowPrompt.includes("in progress")) {
     rawParams.status = "In Progress";
   } else if (lowPrompt.includes("completed") || lowPrompt.includes("done")) {

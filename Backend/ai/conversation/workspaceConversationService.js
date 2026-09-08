@@ -1670,14 +1670,17 @@ class WorkspaceConversationService {
       }
     }
 
-    // 6. Check for Read-Only / Direct Task Mutation Commands (Execute immediately!)
+    // 6. Check for Read-Only / Direct Task Mutation & Reminder Commands (Execute immediately!)
     const cmd = commandRegistry.getCommand(commandName);
     const isDirectExecutable =
       cmd &&
       (cmd.actionType === "READ" ||
         commandName === "task.update" ||
         commandName === "task.updateStatus" ||
-        commandName === "task.complete");
+        commandName === "task.complete" ||
+        commandName === "reminder.create" ||
+        commandName === "task.reminder" ||
+        commandName === "sla.scan");
 
     if (isDirectExecutable) {
       const execResult = await createCommandExecution({

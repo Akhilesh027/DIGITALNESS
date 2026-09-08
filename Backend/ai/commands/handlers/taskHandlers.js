@@ -22,16 +22,36 @@ exports.getPendingTasks = async (params = {}, ctx = {}) => {
     query.customer = custId;
     const cust = await Customer.findById(custId).select("name companyName").lean();
     if (cust) resolvedCustomerName = cust.name || cust.companyName;
+  } else if (params.customerName || params.clientName) {
+    const searchName = (params.customerName || params.clientName).replace(/client|customer|tasks?|for/gi, "").trim();
+    if (searchName) {
+      const cust = await Customer.findOne({ name: new RegExp(searchName, "i") }).select("name companyName").lean();
+      if (cust) {
+        query.customer = cust._id;
+        resolvedCustomerName = cust.name || cust.companyName;
+      }
+    }
   }
 
   if (params.assignedTo) {
     query.assignedTo = params.assignedTo;
+  } else if (params.employeeName || params.assigneeName) {
+    const empName = (params.employeeName || params.assigneeName).replace(/tasks?|for|assigned|to|working\s+on/gi, "").trim();
+    if (empName) {
+      const emp = await User.findOne({ name: new RegExp(empName, "i") }).select("_id name").lean();
+      if (emp) query.assignedTo = emp._id;
+    }
   }
 
-  const isToday = params.isToday || params.timeframe === "TODAY" || (params.prompt && /today/i.test(params.prompt));
-  const isTomorrow = params.isTomorrow || params.timeframe === "TOMORROW" || (params.prompt && /to+m+o+r+o+w/i.test(params.prompt));
+  const now = new Date();
+  const isToday = params.isToday || params.timeframe === "TODAY" || (params.prompt && /\btoday\b/i.test(params.prompt));
+  const isTomorrow = params.isTomorrow || params.timeframe === "TOMORROW" || (params.prompt && /\bto+m+o+r+r?o+w\b/i.test(params.prompt));
+  const isOverdue = params.isOverdue || params.overdue || (params.prompt && /\boverdue\b/i.test(params.prompt));
+  const isAtRisk = params.isAtRisk || params.atRisk || (params.prompt && /\b(at\s+risk|sla\s+risk|delayed)\b/i.test(params.prompt));
 
-  if (isToday) {
+  if (isOverdue) {
+    query.dueDate = { $lt: now };
+  } else if (isToday) {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const endOfToday = new Date();
@@ -53,18 +73,61 @@ exports.getPendingTasks = async (params = {}, ctx = {}) => {
   }
 
   const limit = Math.min(Number(params.limit) || 20, 50);
-  const tasks = await Work.find(query)
-    .populate("customer", "name companyName city")
-    .populate("assignedTo", "name email role")
+  const rawTasks = await Work.find(query)
+    .populate("customer", "name companyName city brandProfile")
+    .populate("assignedTo", "name email role department")
     .sort({ dueDate: 1, createdAt: -1 })
     .limit(limit)
     .lean();
+
+  // Enrich tasks with computed SLA status, countdowns, and risk badges
+  const tasks = rawTasks.map((t) => {
+    const due = t.dueDate ? new Date(t.dueDate) : null;
+    let timeStatus = "No Due Date";
+    let slaBadge = "🟢 On Track";
+    let isBreached = false;
+
+    if (due) {
+      const diffMs = due.getTime() - now.getTime();
+      const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffMs < 0) {
+        isBreached = true;
+        slaBadge = "🔴 OVERDUE BREACH";
+        timeStatus = Math.abs(diffHours) < 24 ? `Overdue by ${Math.abs(diffHours)}h` : `Overdue by ${Math.abs(diffDays)}d`;
+      } else if (diffHours <= 6) {
+        slaBadge = "🟡 Critical Risk (<6h left)";
+        timeStatus = `Due in ${diffHours}h`;
+      } else if (diffHours <= 24) {
+        slaBadge = "🟡 Due Today";
+        timeStatus = `Due Today at ${due.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
+      } else {
+        slaBadge = "🟢 On Track";
+        timeStatus = `Due in ${diffDays} days (${due.toLocaleDateString("en-IN", { day: "numeric", month: "short" })})`;
+      }
+    }
+
+    const assignedUser = t.assignedTo && t.assignedTo[0] ? t.assignedTo[0] : null;
+    const clientName = t.customer?.name || t.customer?.companyName || t.clientName || "General Client";
+
+    return {
+      ...t,
+      computedSlaBadge: slaBadge,
+      computedTimeStatus: timeStatus,
+      isBreached,
+      formattedClientName: clientName,
+      assigneeName: assignedUser ? assignedUser.name : "Unassigned",
+      assigneeRole: assignedUser ? assignedUser.role : "None",
+    };
+  });
 
   return {
     count: tasks.length,
     tasks,
     isToday,
     isTomorrow,
+    isOverdue,
     customerName: resolvedCustomerName,
     requestedStatus: params.status || null,
   };
@@ -87,12 +150,52 @@ exports.searchTasks = async (params = {}, ctx = {}) => {
   }
 
   const limit = Math.min(Number(params.limit) || 20, 50);
-  const tasks = await Work.find(query)
-    .populate("customer", "name companyName")
-    .populate("assignedTo", "name email")
+  const rawTasks = await Work.find(query)
+    .populate("customer", "name companyName city")
+    .populate("assignedTo", "name email role department")
     .sort({ createdAt: -1 })
     .limit(limit)
     .lean();
+
+  const now = new Date();
+  const tasks = rawTasks.map((t) => {
+    const due = t.dueDate ? new Date(t.dueDate) : null;
+    let timeStatus = "No Due Date";
+    let slaBadge = "🟢 On Track";
+    let isBreached = false;
+
+    if (due) {
+      const diffMs = due.getTime() - now.getTime();
+      const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffMs < 0) {
+        isBreached = true;
+        slaBadge = "🔴 OVERDUE BREACH";
+        timeStatus = Math.abs(diffHours) < 24 ? `Overdue by ${Math.abs(diffHours)}h` : `Overdue by ${Math.abs(diffDays)}d`;
+      } else if (diffHours <= 6) {
+        slaBadge = "🟡 Critical Risk (<6h left)";
+        timeStatus = `Due in ${diffHours}h`;
+      } else if (diffHours <= 24) {
+        slaBadge = "🟡 Due Today";
+        timeStatus = `Due in ${diffHours}h`;
+      } else {
+        slaBadge = "🟢 On Track";
+        timeStatus = `Due in ${diffDays} days`;
+      }
+    }
+
+    const assignedUser = t.assignedTo && t.assignedTo[0] ? t.assignedTo[0] : null;
+    return {
+      ...t,
+      computedSlaBadge: slaBadge,
+      computedTimeStatus: timeStatus,
+      isBreached,
+      formattedClientName: t.customer?.name || t.customer?.companyName || t.clientName || "General Client",
+      assigneeName: assignedUser ? assignedUser.name : "Unassigned",
+      assigneeRole: assignedUser ? assignedUser.role : "None",
+    };
+  });
 
   return {
     count: tasks.length,
@@ -479,5 +582,117 @@ exports.assignCustomer = async (params = {}, ctx = {}) => {
     taskCount: tasks.length,
     taskTitle: tasks.map((t) => t.title).join(", ") || "Website UI & Assets",
     customerName: customer.name,
+  };
+};
+
+/**
+ * Creates and schedules an intelligent proactive reminder
+ */
+exports.createReminder = async (params = {}, ctx = {}) => {
+  const Notification = require("../../../models/Notification");
+  const ScheduledJob = require("../../../models/ScheduledJob");
+  const User = require("../../../models/User");
+
+  const prompt = params.prompt || params.text || "";
+  const title = params.title || params.taskTitle || "Task & Deliverable Follow-up";
+  const now = new Date();
+
+  // 1. Calculate Target Scheduled Date/Time
+  let scheduledFor = new Date(now);
+  let timeLabel = "in 2 hours";
+
+  if (params.scheduledFor) {
+    scheduledFor = new Date(params.scheduledFor);
+    timeLabel = scheduledFor.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+  } else if (/tomorrow/i.test(prompt)) {
+    scheduledFor.setDate(scheduledFor.getDate() + 1);
+    if (/10\s*(?:am)?/i.test(prompt)) scheduledFor.setHours(10, 0, 0, 0);
+    else if (/5\s*(?:pm)?/i.test(prompt)) scheduledFor.setHours(17, 0, 0, 0);
+    else scheduledFor.setHours(10, 0, 0, 0);
+    timeLabel = `Tomorrow at ${scheduledFor.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}`;
+  } else if (/in\s+(\d+)\s+hours?/i.test(prompt)) {
+    const hours = Number(prompt.match(/in\s+(\d+)\s+hours?/i)[1]);
+    scheduledFor.setHours(scheduledFor.getHours() + hours);
+    timeLabel = `in ${hours} hours (${scheduledFor.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })})`;
+  } else if (/in\s+(\d+)\s+mins?|minutes?/i.test(prompt)) {
+    const mins = Number(prompt.match(/in\s+(\d+)\s+mins?|minutes?/i)[1]);
+    scheduledFor.setMinutes(scheduledFor.getMinutes() + mins);
+    timeLabel = `in ${mins} minutes`;
+  } else if (/tonight|today\s+evening/i.test(prompt)) {
+    scheduledFor.setHours(19, 0, 0, 0);
+    timeLabel = `Tonight at 7:00 PM`;
+  } else {
+    // Default 2 hours from now
+    scheduledFor.setHours(scheduledFor.getHours() + 2);
+    timeLabel = `in 2 hours (${scheduledFor.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })})`;
+  }
+
+  // 2. Resolve target recipient (Admin / Current User)
+  let recipient = ctx.userId;
+  if (!recipient) {
+    const admin = await User.findOne({ role: "Admin" }).select("_id").lean();
+    if (admin) recipient = admin._id;
+  }
+  if (!recipient) {
+    const anyUser = await User.findOne().select("_id").lean();
+    if (anyUser) recipient = anyUser._id;
+  }
+
+  // 3. Resolve target Work item if mentioned
+  let workItem = null;
+  if (params.workId || params.taskId) {
+    workItem = await Work.findById(params.workId || params.taskId).populate("customer", "name").lean();
+  } else {
+    // Attempt fuzzy match on title in prompt
+    const cleanSubject = prompt.replace(/remind\s+me|set\s+reminder|alert\s+me|tomorrow|today|at\s+\d+|in\s+\d+\s+hours?|to\s+check|about/gi, "").trim();
+    if (cleanSubject && cleanSubject.length >= 3) {
+      workItem = await Work.findOne({ title: new RegExp(cleanSubject, "i") }).populate("customer", "name").lean();
+    }
+  }
+
+  const reminderMessage = params.message || (workItem
+    ? `Reminder: Follow up on deliverable "${workItem.title}" for ${workItem.customer?.name || "Client"}. Target deadline: ${workItem.dueDate ? new Date(workItem.dueDate).toLocaleDateString("en-IN") : "Pending"}`
+    : `Reminder: ${prompt.replace(/remind\s+me\s+(?:to\s+)?/i, "")}`);
+
+  // 4. Save Notification in MongoDB
+  const notification = await Notification.create({
+    title: `⏰ Reminder: ${workItem?.title || "Deliverable Check"}`,
+    message: reminderMessage,
+    type: "task",
+    moduleId: workItem ? workItem._id : (recipient || new (require("mongoose").Types.ObjectId)()),
+    moduleModel: "Work",
+    recipient: recipient || new (require("mongoose").Types.ObjectId)(),
+    createdBy: recipient || null,
+    isRead: false,
+    link: workItem ? `/works?id=${workItem._id}` : "/works",
+  });
+
+  // 5. Schedule ScheduledJob
+  let scheduledJob = null;
+  try {
+    scheduledJob = await ScheduledJob.create({
+      jobType: "Reminder",
+      queueName: "notifications",
+      entityType: "Work",
+      entityId: workItem ? workItem._id : notification._id,
+      scheduledFor,
+      status: "Scheduled",
+      payload: {
+        notificationId: notification._id,
+        recipientId: recipient,
+        message: reminderMessage,
+      },
+    });
+  } catch (e) {}
+
+  return {
+    success: true,
+    scheduledFor,
+    timeLabel,
+    reminderMessage,
+    targetTask: workItem ? workItem.title : null,
+    clientName: workItem?.customer?.name || null,
+    notificationId: notification._id,
+    jobId: scheduledJob?._id || null,
   };
 };

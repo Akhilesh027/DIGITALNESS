@@ -896,6 +896,45 @@ class CommandRegistry {
     });
 
     this.registerCommand({
+      command: "reminder.create",
+      description: "Schedule an intelligent reminder and alert for tasks or deliverables",
+      category: "TASK",
+      actionType: ACTION_TYPES.WRITE,
+      riskLevel: RISK_LEVELS.LOW_RISK_WRITE,
+      requiredRoles: ["Admin", "Manager", "Employee", "Telecaller"],
+      approvalRequired: false,
+      supportsRollback: false,
+      handler: taskHandlers.createReminder,
+      verifier: null,
+    });
+
+    this.registerCommand({
+      command: "task.reminder",
+      description: "Schedule an intelligent reminder for task follow-up",
+      category: "TASK",
+      actionType: ACTION_TYPES.WRITE,
+      riskLevel: RISK_LEVELS.LOW_RISK_WRITE,
+      requiredRoles: ["Admin", "Manager", "Employee", "Telecaller"],
+      approvalRequired: false,
+      supportsRollback: false,
+      handler: taskHandlers.createReminder,
+      verifier: null,
+    });
+
+    this.registerCommand({
+      command: "sla.getSummary",
+      description: "Retrieve complete SLA health summary, compliance score, and active incident metrics",
+      category: "GENERAL",
+      actionType: ACTION_TYPES.READ,
+      riskLevel: RISK_LEVELS.READ,
+      requiredRoles: ["Admin", "Manager", "Operational Manager"],
+      approvalRequired: false,
+      supportsRollback: false,
+      handler: slaHandlers.getSLASummary,
+      verifier: null,
+    });
+
+    this.registerCommand({
       command: "sla.extendDeadline",
       description: "Extend task deadline and reschedule client deliverable slot",
       category: "GENERAL",

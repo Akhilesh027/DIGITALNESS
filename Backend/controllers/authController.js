@@ -177,11 +177,11 @@ exports.registerUser = async (req, res) => {
       skills: Array.isArray(skills)
         ? skills
         : typeof skills === "string"
-        ? skills
+          ? skills
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean)
-        : [],
+          : [],
       emergencyContact: emergencyContact || {},
       bankDetails: bankDetails || {},
       documents: Array.isArray(documents) ? documents : [],

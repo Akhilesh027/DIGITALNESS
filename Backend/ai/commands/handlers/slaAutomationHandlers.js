@@ -15,6 +15,39 @@ exports.scanSLA = async (params = {}, ctx = {}) => {
   return result;
 };
 
+exports.getSLASummary = async (params = {}, ctx = {}) => {
+  const [totalActive, overdueTasks, criticalIncidents, highIncidents] = await Promise.all([
+    Work.countDocuments({ status: { $nin: ["Completed", "Failed"] } }),
+    Work.countDocuments({ status: { $nin: ["Completed", "Failed"] }, dueDate: { $lt: new Date() } }),
+    SLAIncident.countDocuments({ status: { $in: ["DETECTED", "ESCALATED"] }, severity: "CRITICAL" }),
+    SLAIncident.countDocuments({ status: { $in: ["DETECTED", "ESCALATED"] }, severity: "HIGH" }),
+  ]);
+
+  const onTrackCount = Math.max(0, totalActive - (overdueTasks + criticalIncidents));
+  const complianceRate = totalActive > 0 ? Math.round((onTrackCount / totalActive) * 100) : 100;
+
+  const criticalTasks = await Work.find({
+    status: { $nin: ["Completed", "Failed"] },
+    $or: [{ dueDate: { $lt: new Date() } }, { "sla.riskScore": { $gte: 80 } }],
+  })
+    .populate("customer", "name companyName city")
+    .populate("assignedTo", "name role department")
+    .sort({ dueDate: 1 })
+    .limit(10)
+    .lean();
+
+  return {
+    totalActive,
+    overdueTasks,
+    criticalIncidents,
+    highIncidents,
+    onTrackCount,
+    complianceRate,
+    healthStatus: complianceRate >= 90 ? "EXCELLENT" : complianceRate >= 75 ? "GOOD" : "CRITICAL_ATTENTION",
+    tasks: criticalTasks,
+  };
+};
+
 exports.getIncidents = async (params = {}, ctx = {}) => {
   const limit = params.limit ? Number(params.limit) : 20;
   const incidents = await slaGuardianEngine.getActiveIncidents(limit);
@@ -25,34 +58,68 @@ exports.getIncidents = async (params = {}, ctx = {}) => {
 };
 
 exports.getAtRiskTasks = async (params = {}, ctx = {}) => {
+  const now = new Date();
   const tasks = await Work.find({
     status: { $nin: ["Completed", "Failed"] },
-    "sla.riskScore": { $gte: 50 },
+    $or: [{ dueDate: { $lt: now } }, { "sla.riskScore": { $gte: 50 } }],
   })
     .populate("customer", "name companyName city")
-    .populate("assignedTo", "name role")
-    .sort({ "sla.riskScore": -1 })
+    .populate("assignedTo", "name role department")
+    .sort({ dueDate: 1, "sla.riskScore": -1 })
+    .limit(30)
     .lean();
 
   return {
     count: tasks.length,
-    tasks,
+    tasks: tasks.map((t) => {
+      const isOverdue = t.dueDate && new Date(t.dueDate) < now;
+      return {
+        ...t,
+        formattedClientName: t.customer?.name || t.clientName || "Client",
+        assigneeName: t.assignedTo?.[0]?.name || "Unassigned",
+        computedSlaBadge: isOverdue ? "🔴 OVERDUE BREACH" : "🟡 AT RISK",
+      };
+    }),
   };
 };
 
 exports.getCriticalTasks = async (params = {}, ctx = {}) => {
+  const now = new Date();
   const tasks = await Work.find({
     status: { $nin: ["Completed", "Failed"] },
-    "sla.riskScore": { $gte: 85 },
+    $or: [{ dueDate: { $lt: now } }, { "sla.riskScore": { $gte: 80 } }, { priority: "Urgent" }],
   })
     .populate("customer", "name companyName city")
-    .populate("assignedTo", "name role")
-    .sort({ "sla.riskScore": -1 })
+    .populate("assignedTo", "name role department")
+    .sort({ dueDate: 1, "sla.riskScore": -1 })
+    .limit(20)
     .lean();
+
+  const totalActive = await Work.countDocuments({ status: { $nin: ["Completed", "Failed"] } });
+  const overdueCount = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < now).length;
+  const complianceRate = totalActive > 0 ? Math.round(((totalActive - overdueCount) / totalActive) * 100) : 100;
 
   return {
     count: tasks.length,
-    tasks,
+    totalActive,
+    overdueCount,
+    complianceRate,
+    tasks: tasks.map((t) => {
+      const isOverdue = t.dueDate && new Date(t.dueDate) < now;
+      let hoursOverdue = 0;
+      if (isOverdue) {
+        hoursOverdue = Math.round((now.getTime() - new Date(t.dueDate).getTime()) / (1000 * 60 * 60));
+      }
+      return {
+        ...t,
+        formattedClientName: t.customer?.name || t.clientName || "Client",
+        assigneeName: t.assignedTo?.[0]?.name || "Unassigned",
+        assigneeRole: t.assignedTo?.[0]?.role || "None",
+        isOverdue,
+        hoursOverdue,
+        computedSlaBadge: isOverdue ? `🔴 OVERDUE BREACH (${hoursOverdue}h)` : "🟡 CRITICAL DEADLINE",
+      };
+    }),
   };
 };
 
