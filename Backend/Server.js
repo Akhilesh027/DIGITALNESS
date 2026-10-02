@@ -47,6 +47,8 @@ const allowedOrigins = [
   "https://server.digitalness.co.in",
   "http://admincrm.digitalness.co.in",
   "https://admincrm.digitalness.co.in",
+  "http://client.digitalness.co.in",
+  "https://client.digitalness.co.in",
   process.env.CLIENT_URL,
   process.env.CLIENT_APP_URL,
 ].filter(Boolean);
