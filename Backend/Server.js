@@ -1,4 +1,4 @@
-// Digitalness CRM Production Server v2.4 (Full-Spectrum Master Seed Active - August 2026)
+// Digitalness CRM Production Server v2.4 (Full-Spectrum Master Seed Active - 2026)
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -30,6 +30,8 @@ const server = http.createServer(app);
 const allowedOrigins = [
   "http://localhost:8080",
   "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
   "http://localhost:3000",
   "exp://10.77.15.28:8081",
   "http://localhost:8081",
@@ -42,18 +44,24 @@ const allowedOrigins = [
   "https://www.digitalness.co.in",
   "http://server.digitalness.co.in",
   "https://server.digitalness.co.in",
+  "https://server.digitalness.co.in",
   "http://admincrm.digitalness.co.in",
   "https://admincrm.digitalness.co.in",
   process.env.CLIENT_URL,
+  process.env.CLIENT_APP_URL,
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      ) {
         callback(null, true);
       } else {
-        callback(new Error("Not allowed by CORS"));
+        callback(new Error(`Not allowed by CORS: ${origin}`));
       }
     },
     credentials: true,
@@ -103,6 +111,8 @@ io.on("connection", (socket) => {
   });
 });
 
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 app.get("/", (req, res) => {
   res.send("Digitalness CRM Backend is running...");
 });
@@ -143,7 +153,7 @@ app.use("/api/creative-projects", require("./routes/creativeProjectRoutes.js"));
 app.use("/api/marketing-connections", require("./routes/marketingConnectionRoutes.js"));
 app.use("/api/expenses", require("./routes/expenseRoutes.js"));
 app.use("/api/invoices", require("./routes/invoiceRoutes.js"));
-app.use("/api/payments", require("./routes/invoiceRoutes.js"));
+app.use("/api/payments", require("./routes/paymentRoutes.js"));
 app.use("/api/system/queues", require("./routes/systemQueueRoutes.js"));
 app.use("/api/system/certification", require("./routes/certificationRoutes.js"));
 app.use("/api/creatives", require("./routes/creativeRoutes.js"));

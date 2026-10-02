@@ -76,6 +76,14 @@ const invoiceSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    documentUrl: {
+      type: String,
+      default: "",
+    },
+    documentName: {
+      type: String,
+      default: "",
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -86,7 +94,7 @@ const invoiceSchema = new mongoose.Schema(
 );
 
 // Pre-save hook: automatically sync balanceAmount and paymentStatus
-invoiceSchema.pre("save", function (next) {
+invoiceSchema.pre("save", function () {
   this.balanceAmount = Math.max(0, this.originalAmount - (this.paidAmount || 0));
 
   if (this.paymentStatus !== "DISPUTED" && this.paymentStatus !== "CANCELLED") {
@@ -100,7 +108,6 @@ invoiceSchema.pre("save", function (next) {
       this.paymentStatus = "UNPAID";
     }
   }
-  next();
 });
 
 module.exports = mongoose.model("Invoice", invoiceSchema);

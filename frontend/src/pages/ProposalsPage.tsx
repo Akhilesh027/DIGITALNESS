@@ -46,6 +46,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { socket } from "@/lib/socket";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 
@@ -793,6 +794,75 @@ export default function ProposalsPage() {
   useEffect(() => {
     fetchProposals();
     fetchDeals();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchParam = urlParams.get("search");
+    if (searchParam) {
+      setSearch(searchParam);
+    }
+  }, []);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const dealIdParam = urlParams.get("dealId");
+    if (dealIdParam && deals.length > 0) {
+      handleDealSelect(dealIdParam);
+      setOpen(true);
+    }
+  }, [deals]);
+
+  // Real-time synchronization across CRM sections
+  useEffect(() => {
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const handleProposalCreated = (data: any) => {
+      if (!data) return;
+      setProposals((prev) => {
+        const id = getItemId(data);
+        if (prev.some((p) => getItemId(p) === id)) {
+          return prev.map((p) => (getItemId(p) === id ? data : p));
+        }
+        return [data, ...prev];
+      });
+    };
+
+    const handleProposalUpdated = (data: any) => {
+      if (!data) return;
+      const id = getItemId(data);
+      setProposals((prev) => prev.map((p) => (getItemId(p) === id ? data : p)));
+      setPreviewProposal((prev) => (prev && getItemId(prev) === id ? data : prev));
+    };
+
+    const handleProposalDeleted = (data: any) => {
+      const id = data?._id || data?.id;
+      if (id) {
+        setProposals((prev) => prev.filter((p) => getItemId(p) !== id));
+      }
+    };
+
+    const handleLocalSync = (e: any) => {
+      if (e.detail) {
+        handleProposalUpdated(e.detail);
+      } else {
+        fetchProposals();
+      }
+    };
+
+    socket.on("proposal_created", handleProposalCreated);
+    socket.on("proposal_updated", handleProposalUpdated);
+    socket.on("proposal_status_updated", handleProposalUpdated);
+    socket.on("proposal_deleted", handleProposalDeleted);
+    window.addEventListener("crm_proposal_updated", handleLocalSync);
+
+    return () => {
+      socket.off("proposal_created", handleProposalCreated);
+      socket.off("proposal_updated", handleProposalUpdated);
+      socket.off("proposal_status_updated", handleProposalUpdated);
+      socket.off("proposal_deleted", handleProposalDeleted);
+      window.removeEventListener("crm_proposal_updated", handleLocalSync);
+    };
   }, []);
 
   const analytics = useMemo(() => {
@@ -1108,7 +1178,10 @@ export default function ProposalsPage() {
       } else {
         setProposals((prev) => [savedProposal, ...prev]);
       }
-      toast({ title: "Saved successfully", description: "Proposal data saved to backend" });
+      toast({ title: "Saved successfully", description: "Proposal data saved and synchronized across CRM" });
+      window.dispatchEvent(new CustomEvent("crm_proposal_updated", { detail: savedProposal }));
+      window.dispatchEvent(new CustomEvent("crm_deal_updated", { detail: savedProposal.dealId }));
+      window.dispatchEvent(new CustomEvent("crm_lead_updated", { detail: savedProposal.leadId }));
       fetchProposals();
       setOpen(false);
       resetForm();
@@ -1131,7 +1204,10 @@ export default function ProposalsPage() {
       if (!res.ok) throw new Error(data.message || "Failed to update status");
       const updatedProposal = data.data || data.proposal || data;
       setProposals((prev) => prev.map((p) => (getItemId(p) === proposalId ? updatedProposal : p)));
-      toast({ title: "Status updated", description: `Proposal marked as ${status}` });
+      toast({ title: "Status updated", description: `Proposal marked as ${status} & synced across CRM` });
+      window.dispatchEvent(new CustomEvent("crm_proposal_updated", { detail: updatedProposal }));
+      window.dispatchEvent(new CustomEvent("crm_deal_updated", { detail: updatedProposal.dealId }));
+      window.dispatchEvent(new CustomEvent("crm_lead_updated", { detail: updatedProposal.leadId }));
       fetchProposals();
     } catch (error: any) {
       toast({ title: "Status update failed", description: error.message || "Failed to update proposal status", variant: "destructive" });
@@ -1170,6 +1246,8 @@ export default function ProposalsPage() {
       const updatedProposal = data.data || data.proposal || data;
       setProposals((prev) => prev.map((p) => (getItemId(p) === proposalId ? updatedProposal : p)));
       toast({ title: "Mail sent successfully", description: `Proposal sent to ${clientEmail}` });
+      window.dispatchEvent(new CustomEvent("crm_proposal_updated", { detail: updatedProposal }));
+      window.dispatchEvent(new CustomEvent("crm_deal_updated", { detail: updatedProposal.dealId }));
     } catch (error: any) {
       toast({ title: "Mail failed", description: error.message || "Failed to send proposal mail", variant: "destructive" });
     } finally {

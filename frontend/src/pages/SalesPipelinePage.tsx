@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -13,6 +14,8 @@ import {
   X,
   MessageSquare,
   Trophy,
+  FileText,
+  ExternalLink,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -33,6 +36,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { socket } from "@/lib/socket";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 
@@ -119,6 +123,7 @@ const getArrayData = (data: any) => {
 
 export default function SalesPipelinePage() {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const currentUser = getCurrentUser();
 
   const userRole = String(currentUser?.role || "")
@@ -258,6 +263,98 @@ export default function SalesPipelinePage() {
   useEffect(() => {
     fetchBranches();
     fetchData();
+  }, []);
+
+  // Real-time synchronization across CRM sections
+  useEffect(() => {
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const handleDealUpdated = (updatedDeal: any) => {
+      if (!updatedDeal) return;
+      const targetId = getDealId(updatedDeal);
+      setDeals((prev) =>
+        prev.map((d) => (String(getDealId(d)) === String(targetId) ? updatedDeal : d))
+      );
+      setSelectedDeal((prev) =>
+        prev && String(getDealId(prev)) === String(targetId) ? updatedDeal : prev
+      );
+    };
+
+    const handleDealCreated = (createdDeal: any) => {
+      if (!createdDeal) return;
+      const targetId = getDealId(createdDeal);
+      setDeals((prev) => {
+        if (prev.some((d) => String(getDealId(d)) === String(targetId))) {
+          return prev.map((d) => (String(getDealId(d)) === String(targetId) ? createdDeal : d));
+        }
+        return [createdDeal, ...prev];
+      });
+    };
+
+    const handleProposalChanged = (proposal: any) => {
+      if (proposal?.dealId) {
+        const linkedDealId = proposal.dealId._id || proposal.dealId;
+        setDeals((prev) =>
+          prev.map((d) => {
+            if (String(getDealId(d)) === String(linkedDealId)) {
+              return {
+                ...d,
+                proposalId: proposal,
+                proposalCreated: true,
+                dealValue: proposal.grandTotal || proposal.proposalValue || d.dealValue,
+                stage: ["Approved", "Accepted"].includes(proposal.status)
+                  ? "Won"
+                  : ["Sent", "Viewed"].includes(proposal.status) && ["New", "Contacted", "Discovery", "Qualified"].includes(d.stage)
+                    ? "Proposal"
+                    : d.stage,
+              };
+            }
+            return d;
+          })
+        );
+        setSelectedDeal((prev) => {
+          if (prev && String(getDealId(prev)) === String(linkedDealId)) {
+            return {
+              ...prev,
+              proposalId: proposal,
+              proposalCreated: true,
+              dealValue: proposal.grandTotal || proposal.proposalValue || prev.dealValue,
+            };
+          }
+          return prev;
+        });
+      } else {
+        fetchData();
+      }
+    };
+
+    socket.on("deal_updated", handleDealUpdated);
+    socket.on("deal_created", handleDealCreated);
+    socket.on("proposal_created", handleProposalChanged);
+    socket.on("proposal_updated", handleProposalChanged);
+    socket.on("proposal_status_updated", handleProposalChanged);
+
+    const handleLocalProposalSync = (e: any) => {
+      if (e.detail) {
+        handleProposalChanged(e.detail);
+      } else {
+        fetchData();
+      }
+    };
+    window.addEventListener("crm_proposal_updated", handleLocalProposalSync);
+    window.addEventListener("crm_deal_updated", handleLocalProposalSync);
+
+    return () => {
+      socket.off("deal_updated", handleDealUpdated);
+      socket.off("deal_created", handleDealCreated);
+      socket.off("proposal_created", handleProposalChanged);
+      socket.off("proposal_updated", handleProposalChanged);
+      socket.off("proposal_status_updated", handleProposalChanged);
+      window.removeEventListener("crm_proposal_updated", handleLocalProposalSync);
+      window.removeEventListener("crm_deal_updated", handleLocalProposalSync);
+    };
   }, []);
 
   const getDealId = (deal: any) => deal._id || deal.id;
@@ -771,6 +868,23 @@ export default function SalesPipelinePage() {
                       </div>
                     </div>
 
+                    {/* Proposal Status Badge on Deal Card */}
+                    {deal.proposalId && (
+                      <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-[11px] font-semibold text-amber-500 mb-2">
+                        <div className="flex items-center gap-1 min-w-0">
+                          <FileText className="w-3 h-3 shrink-0" />
+                          <span className="truncate">
+                            {typeof deal.proposalId === "object" ? deal.proposalId.status || "Draft" : "Proposal Linked"}
+                          </span>
+                        </div>
+                        {typeof deal.proposalId === "object" && deal.proposalId.proposalNumber && (
+                          <span className="font-mono text-[10px] text-muted-foreground shrink-0">
+                            {deal.proposalId.proposalNumber}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between">
                       <Badge variant="outline" className="text-xs">
                         {deal.probability || 0}%
@@ -1061,6 +1175,86 @@ export default function SalesPipelinePage() {
                       </Button>
                     ))}
                   </div>
+                </div>
+
+                {/* Linked Proposal Synchronization Section */}
+                <div className="p-4 rounded-xl border border-border bg-card/60 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-primary" />
+                      <h4 className="font-semibold text-sm">CRM Proposal Status</h4>
+                    </div>
+                    {selectedDeal.proposalId ? (
+                      <Badge className={
+                        (typeof selectedDeal.proposalId === "object" && ["Approved", "Accepted"].includes(selectedDeal.proposalId.status))
+                          ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30"
+                          : (typeof selectedDeal.proposalId === "object" && ["Sent", "Viewed"].includes(selectedDeal.proposalId.status))
+                            ? "bg-blue-500/10 text-blue-500 border-blue-500/30"
+                            : "bg-amber-500/10 text-amber-500 border-amber-500/30"
+                      }>
+                        {typeof selectedDeal.proposalId === "object" ? selectedDeal.proposalId.status || "Draft" : "Proposal Linked"}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground">No Proposal</Badge>
+                    )}
+                  </div>
+
+                  {selectedDeal.proposalId && typeof selectedDeal.proposalId === "object" ? (
+                    <div className="space-y-2 text-xs">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="p-2.5 rounded-lg bg-muted/30">
+                          <span className="text-muted-foreground block text-[11px]">Proposal Number</span>
+                          <strong className="font-mono text-xs">{selectedDeal.proposalId.proposalNumber || "-"}</strong>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-muted/30">
+                          <span className="text-muted-foreground block text-[11px]">Synchronized Value</span>
+                          <strong className="text-xs font-semibold text-primary">
+                            {formatCurrency(selectedDeal.proposalId.grandTotal || selectedDeal.proposalId.proposalValue || selectedDeal.dealValue)}
+                          </strong>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-muted/30">
+                          <span className="text-muted-foreground block text-[11px]">Package / Title</span>
+                          <span className="truncate block font-medium">{selectedDeal.proposalId.title || selectedDeal.proposalId.packageName || "-"}</span>
+                        </div>
+                        <div className="p-2.5 rounded-lg bg-muted/30">
+                          <span className="text-muted-foreground block text-[11px]">Assigned Specialist</span>
+                          <span className="truncate block font-medium">{employeeName(selectedDeal.proposalId.assignedTo || selectedDeal.assignedTo)}</span>
+                        </div>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full mt-2 gap-1.5 font-semibold text-xs"
+                        onClick={() => {
+                          const query = selectedDeal.proposalId.proposalNumber || selectedDeal.customerName;
+                          setSelectedDeal(null);
+                          navigate(`/proposals?search=${encodeURIComponent(query)}`);
+                        }}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Open & Manage Proposal in Proposals Desk &rarr;</span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                      <span className="text-muted-foreground text-xs leading-relaxed">
+                        No proposal generated for this deal yet. Creating one links all financials, deliverables and assigned users automatically.
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="gradient"
+                        className="shrink-0 gap-1.5 font-bold text-xs"
+                        onClick={() => {
+                          setSelectedDeal(null);
+                          navigate(`/proposals?dealId=${getDealId(selectedDeal)}`);
+                        }}
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>+ Generate Proposal</span>
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div>

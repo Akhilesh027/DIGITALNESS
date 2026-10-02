@@ -1,6 +1,8 @@
 const Proposal = require("../models/Proposal.js");
 const Customer = require("../models/Customer.js");
 const Deal = require("../models/Deal.js");
+const Lead = require("../models/Lead.js");
+const Notification = require("../models/Notification.js");
 const sendMail = require("../utils/sendMail");
 
 const ADMIN_ROLES = ["Admin", "admin"];
@@ -25,7 +27,22 @@ const getProposalEmail = (proposal) => {
   );
 };
 
-const getRoleFilter = (user) => {
+const getRoleFilter = (user, query = {}) => {
+  if (user?.role === "Client" || user?.type === "client" || user?.customerId) {
+    const cId = user.customerId || user._id;
+    const orConditions = [{ customerId: cId }];
+    if (user.email) {
+      const emailLower = String(user.email).trim().toLowerCase();
+      orConditions.push({ clientEmail: emailLower });
+      orConditions.push({ email: emailLower });
+    }
+    return { $or: orConditions };
+  }
+
+  if (query.customerId) {
+    return { customerId: query.customerId };
+  }
+
   if (ADMIN_ROLES.includes(user?.role)) return {};
 
   if (MANAGER_ROLES.includes(user?.role)) {
@@ -209,9 +226,227 @@ const buildProposalMailTemplate = ({ proposal, message }) => {
   `;
 };
 
+const syncProposalWithRelatedEntities = async ({
+  proposal,
+  previousProposal = null,
+  userId = null,
+  io = null,
+}) => {
+  try {
+    if (!proposal) return;
+
+    const proposalId = proposal._id;
+    const assignedUserId = proposal.assignedTo?._id || proposal.assignedTo || null;
+    const proposalValue = Number(proposal.grandTotal || proposal.proposalValue || 0);
+
+    // 1. SYNCHRONIZE WITH DEAL
+    if (proposal.dealId) {
+      const dealId = proposal.dealId._id || proposal.dealId;
+      const deal = await Deal.findById(dealId);
+
+      if (deal) {
+        deal.proposalId = proposalId;
+        deal.proposalCreated = true;
+        if (proposalValue > 0) {
+          deal.dealValue = proposalValue;
+        }
+
+        // Synchronize assigned user if specified
+        if (assignedUserId && !deal.assignedTo) {
+          deal.assignedTo = assignedUserId;
+        }
+
+        // Synchronize stage according to proposal status
+        if (["Approved", "Accepted"].includes(proposal.status)) {
+          deal.stage = "Won";
+          deal.customerCreated = true;
+          if (proposal.customerId) {
+            deal.customerId = proposal.customerId;
+          }
+          deal.probability = 100;
+          deal.wonOn = new Date();
+        } else if (["Sent", "Viewed"].includes(proposal.status)) {
+          if (["New", "Contacted", "Discovery", "Qualified"].includes(deal.stage)) {
+            deal.stage = "Proposal";
+            deal.probability = 75;
+          }
+        } else if (proposal.status === "Revision Requested") {
+          if (deal.stage === "Proposal") {
+            deal.stage = "Negotiation";
+            deal.probability = 80;
+          }
+        }
+
+        if (!deal.callLogs) deal.callLogs = [];
+        deal.callLogs.push({
+          callStatus: deal.stage === "Won" ? "Own Close" : "Follow Up",
+          notes: "[Proposal Sync] Proposal " + (proposal.proposalNumber || proposal.title) + " (" + proposal.status + ") synced. Value: Rs." + proposalValue.toLocaleString("en-IN"),
+          calledAt: new Date(),
+          calledBy: userId,
+        });
+
+        await deal.save();
+
+        if (io) {
+          const populatedDeal = await Deal.findById(deal._id)
+            .populate("leadId")
+            .populate("proposalId")
+            .populate("customerId")
+            .populate("assignedTo", "name email phone role department branchId status");
+          io.emit("deal_updated", populatedDeal);
+        }
+      }
+    }
+
+    // If dealId changed on proposal, unlink proposal from the previous deal
+    const prevDealId = previousProposal?.dealId?._id || previousProposal?.dealId;
+    const currentDealId = proposal.dealId?._id || proposal.dealId;
+    if (prevDealId && String(prevDealId) !== String(currentDealId)) {
+      await Deal.findByIdAndUpdate(prevDealId, {
+        $unset: { proposalId: 1 },
+        proposalCreated: false,
+      });
+    }
+
+    // 2. SYNCHRONIZE WITH LEAD
+    let targetLeadId = proposal.leadId?._id || proposal.leadId;
+    if (!targetLeadId && proposal.dealId) {
+      const linkedDeal = await Deal.findById(proposal.dealId?._id || proposal.dealId);
+      if (linkedDeal?.leadId) {
+        targetLeadId = linkedDeal.leadId;
+      }
+    }
+
+    if (targetLeadId) {
+      const lead = await Lead.findById(targetLeadId);
+      if (lead) {
+        lead.proposalId = proposalId;
+        lead.proposalCreated = true;
+
+        if (assignedUserId && !lead.assignedTo) {
+          lead.assignedTo = assignedUserId;
+        }
+
+        if (["Approved", "Accepted"].includes(proposal.status)) {
+          lead.status = "Converted";
+          lead.convertedToCustomer = true;
+          if (proposal.customerId) {
+            lead.customerId = proposal.customerId;
+          }
+          lead.wonOn = new Date();
+        } else if (["Sent", "Viewed"].includes(proposal.status)) {
+          if (["New", "Call Back", "Demo Completed"].includes(lead.status)) {
+            lead.status = "Follow Up";
+          }
+        } else if (proposal.status === "Revision Requested") {
+          lead.status = "Negotiation";
+        }
+
+        if (!lead.notes) lead.notes = [];
+        lead.notes.push(
+          "Proposal " + (proposal.proposalNumber || proposal.title) + " (" + proposal.status + ") synced. Value: Rs." + proposalValue.toLocaleString("en-IN")
+        );
+
+        await lead.save();
+
+        if (io) {
+          const populatedLead = await Lead.findById(lead._id)
+            .populate("assignedTo", "name email role")
+            .populate("proposalId");
+          io.emit("lead_updated", populatedLead);
+        }
+      }
+    }
+
+    // 3. SYNCHRONIZE WITH CUSTOMER
+    let targetCustomerId = proposal.customerId?._id || proposal.customerId;
+    if (targetCustomerId) {
+      const customer = await Customer.findById(targetCustomerId);
+      if (customer) {
+        if (assignedUserId && !customer.assignedTo) {
+          customer.assignedTo = assignedUserId;
+        }
+
+        if (proposal.title && !customer.package) {
+          customer.package = proposal.title;
+        }
+
+        if (Array.isArray(proposal.services) && proposal.services.length > 0) {
+          const serviceNames = proposal.services.map((s) => s.name).filter(Boolean);
+          const currentReqs = new Set(customer.requirements || []);
+          serviceNames.forEach((s) => currentReqs.add(s));
+          customer.requirements = Array.from(currentReqs);
+        }
+
+        if (["Approved", "Accepted"].includes(proposal.status)) {
+          customer.status = "Active";
+          if (customer.totalPending === 0 && proposalValue > 0) {
+            customer.totalPending = proposalValue;
+          }
+        }
+
+        if (!customer.activityLogs) customer.activityLogs = [];
+        customer.activityLogs.push({
+          title: "Proposal " + proposal.status,
+          message: "Proposal " + (proposal.proposalNumber || proposal.title) + " (" + proposal.status + ") was synchronized. Amount: Rs." + proposalValue.toLocaleString("en-IN"),
+          type: "proposal",
+          createdBy: userId,
+          createdAt: new Date(),
+        });
+
+        await customer.save();
+
+        if (io) {
+          const populatedCust = await Customer.findById(customer._id);
+          io.emit("customer_updated", populatedCust);
+        }
+      }
+    }
+
+    // 4. NOTIFICATION DISPATCH
+    if (assignedUserId && String(assignedUserId) !== String(userId)) {
+      try {
+        const notif = await Notification.create({
+          title: "Proposal " + (proposal.proposalNumber || proposal.title) + " Updated",
+          message: "Proposal \"" + proposal.title + "\" for " + (proposal.customerName || "client") + " is now " + proposal.status + ". Value: Rs." + proposalValue.toLocaleString("en-IN"),
+          type: "proposal",
+          moduleId: proposal._id,
+          moduleModel: "Proposal",
+          recipient: assignedUserId,
+          createdBy: userId,
+          link: "/proposals",
+        });
+
+        if (io) {
+          io.emit("notification", notif);
+        }
+      } catch (notifErr) {
+        console.warn("Proposal notification create failed:", notifErr.message);
+      }
+    }
+
+    // 5. GLOBAL CRM SOCKET EVENT
+    if (io) {
+      io.emit("crm_update", {
+        type: "proposal",
+        action: previousProposal ? "updated" : "created",
+        proposalId: proposal._id,
+        dealId: proposal.dealId,
+        leadId: proposal.leadId,
+        customerId: proposal.customerId,
+        status: proposal.status,
+        grandTotal: proposal.grandTotal,
+        assignedTo: proposal.assignedTo,
+      });
+    }
+  } catch (err) {
+    console.error("Error in syncProposalWithRelatedEntities:", err);
+  }
+};
+
 exports.getProposals = async (req, res) => {
   try {
-    const filter = getRoleFilter(req.user);
+    const filter = getRoleFilter(req.user, req.query);
 
     const proposals = await populateProposal(
       Proposal.find(filter).sort({ createdAt: -1 })
@@ -307,6 +542,17 @@ exports.createProposal = async (req, res) => {
       Proposal.findById(proposal._id)
     );
 
+    const io = req.app.get("io");
+    await syncProposalWithRelatedEntities({
+      proposal: populatedProposal,
+      userId,
+      io,
+    });
+
+    if (io) {
+      io.emit("proposal_created", populatedProposal);
+    }
+
     return res.status(201).json({
       success: true,
       message: "Proposal created successfully",
@@ -326,6 +572,8 @@ exports.createProposal = async (req, res) => {
 exports.updateProposal = async (req, res) => {
   try {
     const { id } = req.params;
+
+    const oldProposal = await Proposal.findById(id).lean();
 
     let updates = normalizeProposalPayload(req.body);
 
@@ -369,6 +617,18 @@ exports.updateProposal = async (req, res) => {
       });
     }
 
+    const io = req.app.get("io");
+    await syncProposalWithRelatedEntities({
+      proposal,
+      previousProposal: oldProposal,
+      userId: getUserId(req.user),
+      io,
+    });
+
+    if (io) {
+      io.emit("proposal_updated", proposal);
+    }
+
     return res.status(200).json({
       success: true,
       message: "Proposal updated successfully",
@@ -407,20 +667,16 @@ exports.sendProposalMail = async (req, res) => {
       });
     }
 
+    const clientNameStr = proposal.customerName || proposal.clientName || "";
     const finalSubject =
       subject ||
       proposal.mailSubject ||
-      `Proposal from Digitalness - ${proposal.customerName || proposal.clientName || ""}`;
+      ("Proposal from Digitalness - " + clientNameStr);
 
     const finalMessage =
       message ||
       proposal.mailMessage ||
-      `Dear ${proposal.customerName || proposal.clientName || "Client"},
-
-Please find your proposal details below.
-
-Regards,
-Digitalness Team`;
+      ("Dear " + (clientNameStr || "Client") + ",\n\nPlease find your proposal details below.\n\nRegards,\nDigitalness Team");
 
     await sendMail({
       to: finalEmail,
@@ -445,6 +701,17 @@ Digitalness Team`;
       Proposal.findById(proposal._id)
     );
 
+    const io = req.app.get("io");
+    await syncProposalWithRelatedEntities({
+      proposal: populatedProposal,
+      userId: getUserId(req.user),
+      io,
+    });
+
+    if (io) {
+      io.emit("proposal_updated", populatedProposal);
+    }
+
     return res.status(200).json({
       success: true,
       message: "Proposal mail sent successfully",
@@ -463,13 +730,37 @@ Digitalness Team`;
 
 exports.deleteProposal = async (req, res) => {
   try {
-    const proposal = await Proposal.findByIdAndDelete(req.params.id);
+    const proposal = await Proposal.findById(req.params.id);
 
     if (!proposal) {
       return res.status(404).json({
         success: false,
         message: "Proposal not found",
       });
+    }
+
+    // Unlink from linked Deal
+    if (proposal.dealId) {
+      await Deal.findByIdAndUpdate(proposal.dealId, {
+        $unset: { proposalId: 1 },
+        proposalCreated: false,
+      });
+    }
+
+    // Unlink from linked Lead
+    if (proposal.leadId) {
+      await Lead.findByIdAndUpdate(proposal.leadId, {
+        $unset: { proposalId: 1 },
+        proposalCreated: false,
+      });
+    }
+
+    await Proposal.findByIdAndDelete(req.params.id);
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("proposal_deleted", { _id: req.params.id, id: req.params.id });
+      io.emit("crm_update", { type: "proposal", action: "deleted", id: req.params.id });
     }
 
     return res.status(200).json({
@@ -551,7 +842,7 @@ exports.updateProposalStatus = async (req, res) => {
         if (existingCustomer.activityLogs) {
           existingCustomer.activityLogs.push({
             title: "Proposal Approved",
-            message: `${proposal.title || "Proposal"} approved`,
+            message: (proposal.title || "Proposal") + " approved",
             type: "proposal",
             createdBy: getUserId(req.user),
           });
@@ -580,7 +871,7 @@ exports.updateProposalStatus = async (req, res) => {
           activityLogs: [
             {
               title: "Customer Created From Proposal",
-              message: `${proposal.title || "Proposal"} was approved and converted into customer`,
+              message: (proposal.title || "Proposal") + " was approved and converted into customer",
               type: "proposal",
               createdBy: getUserId(req.user),
             },
@@ -605,6 +896,18 @@ exports.updateProposalStatus = async (req, res) => {
     const updatedProposal = await populateProposal(
       Proposal.findById(proposal._id)
     );
+
+    const io = req.app.get("io");
+    await syncProposalWithRelatedEntities({
+      proposal: updatedProposal,
+      userId: getUserId(req.user),
+      io,
+    });
+
+    if (io) {
+      io.emit("proposal_status_updated", updatedProposal);
+      io.emit("proposal_updated", updatedProposal);
+    }
 
     return res.status(200).json({
       success: true,
@@ -682,7 +985,7 @@ exports.createProposalVersion = async (req, res) => {
       $push: {
         activityLogs: {
           title: "New Version Created",
-          message: `Version ${oldProposal.version + 1} created`,
+          message: "Version " + (oldProposal.version + 1) + " created",
           type: "version",
           createdBy: getUserId(req.user),
         },
@@ -709,7 +1012,7 @@ exports.createProposalVersion = async (req, res) => {
       activityLogs: [
         {
           title: "Proposal Version Created",
-          message: `Created version ${Number(oldProposal.version || 1) + 1}`,
+          message: "Created version " + (Number(oldProposal.version || 1) + 1),
           type: "version",
           createdBy: getUserId(req.user),
         },
@@ -725,6 +1028,17 @@ exports.createProposalVersion = async (req, res) => {
     const populatedProposal = await populateProposal(
       Proposal.findById(newProposal._id)
     );
+
+    const io = req.app.get("io");
+    await syncProposalWithRelatedEntities({
+      proposal: populatedProposal,
+      userId: getUserId(req.user),
+      io,
+    });
+
+    if (io) {
+      io.emit("proposal_created", populatedProposal);
+    }
 
     return res.status(201).json({
       success: true,

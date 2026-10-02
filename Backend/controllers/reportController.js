@@ -2,6 +2,8 @@ const Customer = require("../models/Customer");
 const Work = require("../models/Work");
 const DailyUpdate = require("../models/DailyUpdate");
 const User = require("../models/User");
+const Payment = require("../models/Payment");
+const Invoice = require("../models/Invoice");
 
 const ADMIN_ROLES = ["Admin", "admin"];
 const MANAGER_ROLES = ["Operational Manager", "Branch Manager"];
@@ -311,13 +313,33 @@ exports.getCustomerPaymentReport = async (req, res) => {
   try {
     const customer = await getCustomerOrFail(req.params.customerId, req.user);
 
+    const [payments, invoices] = await Promise.all([
+      Payment.find({ customer: req.params.customerId })
+        .populate("invoice", "invoiceNumber originalAmount paidAmount balanceAmount paymentStatus")
+        .sort({ date: -1, createdAt: -1 }),
+      Invoice.find({ customer: req.params.customerId })
+        .sort({ invoiceDate: -1, createdAt: -1 }),
+    ]);
+
+    const totalPaidFromPayments = payments.reduce(
+      (sum, p) => sum + (p.amount || p.paidAmount || 0),
+      0
+    );
+    const totalInvoiced = invoices.reduce(
+      (sum, i) => sum + (i.originalAmount || i.total || 0),
+      0
+    );
+    const totalPaid = Math.max(Number(customer.totalPaid || 0), totalPaidFromPayments);
+    const totalPending = Math.max(0, totalInvoiced - totalPaid);
+
     res.json({
       success: true,
       data: {
-        totalPaid: Number(customer.totalPaid || 0),
-        totalPending: Number(customer.totalPending || 0),
-        invoices: customer.invoices || [],
-        payments: customer.payments || [],
+        totalPaid,
+        totalPending,
+        totalInvoiced,
+        invoices: invoices.length > 0 ? invoices : customer.invoices || [],
+        payments: payments.length > 0 ? payments : customer.payments || [],
       },
     });
   } catch (error) {

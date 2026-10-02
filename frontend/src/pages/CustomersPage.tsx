@@ -53,6 +53,7 @@ import { useToast } from "@/hooks/use-toast";
 import jsPDF from "jspdf";
 import { getCustomerReadiness, getContextPreview, updateCustomer } from "../api/customerApi";
 import { authHeaders, jsonHeaders, getToken } from "@/api/auth";
+import { socket } from "@/lib/socket";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 
@@ -395,6 +396,44 @@ export default function CustomersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Real-time synchronization with Proposals and Customers across CRM
+  useEffect(() => {
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const handleCustomerSync = (data: any) => {
+      if (data?._id) {
+        setCustomers((prev) => prev.map((c) => (c._id === data._id ? { ...c, ...data } : c)));
+        setSelectedCustomer((prev) => (prev?._id === data._id ? { ...prev, ...data } : prev));
+      } else {
+        fetchCustomers();
+      }
+    };
+
+    const handleProposalSync = () => {
+      fetchCustomers();
+    };
+
+    socket.on("customer_updated", handleCustomerSync);
+    socket.on("proposal_created", handleProposalSync);
+    socket.on("proposal_updated", handleProposalSync);
+    socket.on("proposal_status_updated", handleProposalSync);
+
+    const handleWindowSync = () => {
+      fetchCustomers();
+    };
+    window.addEventListener("crm_proposal_updated", handleWindowSync);
+
+    return () => {
+      socket.off("customer_updated", handleCustomerSync);
+      socket.off("proposal_created", handleProposalSync);
+      socket.off("proposal_updated", handleProposalSync);
+      socket.off("proposal_status_updated", handleProposalSync);
+      window.removeEventListener("crm_proposal_updated", handleWindowSync);
+    };
+  }, []);
+
   const getWorkCustomerId = (work: Work): string | null => {
     if (work.customerId) return work.customerId;
     if (!work.customer) return null;
@@ -589,7 +628,7 @@ export default function CustomersPage() {
       toast({ title: "Email required", description: "Please enter client email", variant: "destructive" });
       return;
     }
-    if (needsPassword && clientPassword.trim().length < 6) {
+    if (clientPassword.trim() && clientPassword.trim().length < 6) {
       toast({ title: "Password required", description: "Password must be at least 6 characters", variant: "destructive" });
       return;
     }
@@ -598,18 +637,21 @@ export default function CustomersPage() {
       const res = await fetch(`${API_URL}/clients/create-login`, {
         method: "POST",
         ...getJsonConfig(),
-        body: JSON.stringify({ customerId: loginCustomer._id, email: clientEmail.trim(), password: needsPassword ? clientPassword.trim() : undefined }),
+        body: JSON.stringify({
+          customerId: loginCustomer._id,
+          email: clientEmail.trim(),
+          password: clientPassword.trim() ? clientPassword.trim() : undefined,
+        }),
       });
       const data = await safeJson(res);
       if (!res.ok) {
-        if (data.needsPassword) {
-          setNeedsPassword(true);
-          toast({ title: "Password Required", description: "This client email is new. Create a password to continue." });
-          return;
-        }
         throw new Error(data.message || "Failed to create client login");
       }
-      toast({ title: "Client Login Ready", description: data.message || "Login created/linked successfully" });
+      const pwMsg = data.password ? ` (Password: ${data.password})` : "";
+      toast({
+        title: "Client Login Ready",
+        description: `${data.message || "Login credentials configured"}${pwMsg}. Details sent to client email.`,
+      });
       closeClientLogin();
       await fetchCustomers();
     } catch (error: any) {
@@ -832,10 +874,44 @@ export default function CustomersPage() {
               <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Login Status</p><p className="font-semibold">{loginCustomer.userId ? "Linked" : "Not Created"}</p></div>
               <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Email</p><p className="font-semibold truncate">{clientEmail || "Required"}</p></div>
             </div>
-            <div><label className="text-sm font-medium mb-1 block">Client Email *</label><Input type="email" placeholder="client@example.com" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} disabled={clientLoginLoading} /></div>
-            {needsPassword && <div><label className="text-sm font-medium mb-1 block">Create Password *</label><Input type="password" placeholder="Minimum 6 characters" value={clientPassword} onChange={(e) => setClientPassword(e.target.value)} disabled={clientLoginLoading} /><p className="text-xs text-muted-foreground mt-1">This email is not registered. Enter password to create new client login.</p></div>}
-            <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground flex gap-2"><Lock className="w-4 h-4 shrink-0" />Use this section for customer password/email management. Backend password reset endpoint can be connected here later.</div>
-            <div className="flex flex-col sm:flex-row gap-2"><Button variant="outline" className="flex-1" onClick={closeClientLogin} disabled={clientLoginLoading}>Cancel</Button><Button variant="gradient" className="flex-1" onClick={handleCreateClientLogin} disabled={clientLoginLoading}>{clientLoginLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}{clientLoginLoading ? "Processing..." : needsPassword ? "Create Login" : "Check / Link Login"}</Button></div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Client Email *</label>
+              <Input
+                type="email"
+                placeholder="client@example.com"
+                value={clientEmail}
+                onChange={(e) => setClientEmail(e.target.value)}
+                disabled={clientLoginLoading}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">
+                Account Password <span className="text-muted-foreground text-xs font-normal">(Optional — leave blank to auto-generate & email)</span>
+              </label>
+              <Input
+                type="text"
+                placeholder="Enter password or leave blank for auto"
+                value={clientPassword}
+                onChange={(e) => setClientPassword(e.target.value)}
+                disabled={clientLoginLoading}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                The password will be securely saved and emailed directly to the client with their portal link.
+              </p>
+            </div>
+            <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground flex gap-2">
+              <Lock className="w-4 h-4 shrink-0 text-amber-500" />
+              <span>Clients can also change their password anytime after logging into their portal under <b>Client Profile &rarr; Password</b>.</span>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Button variant="outline" className="flex-1" onClick={closeClientLogin} disabled={clientLoginLoading}>
+                Cancel
+              </Button>
+              <Button variant="gradient" className="flex-1" onClick={handleCreateClientLogin} disabled={clientLoginLoading}>
+                {clientLoginLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {clientLoginLoading ? "Processing..." : "Generate & Email Credentials"}
+              </Button>
+            </div>
           </div>}
         </DialogContent>
       </Dialog>

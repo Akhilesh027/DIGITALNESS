@@ -32,6 +32,14 @@ const communicationSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    content: {
+      type: String,
+      default: "",
+    },
+    status: {
+      type: String,
+      default: "Sent",
+    },
     by: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -39,6 +47,10 @@ const communicationSchema = new mongoose.Schema(
     byName: {
       type: String,
       default: "System",
+    },
+    metadata: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
     },
   },
   { timestamps: true }

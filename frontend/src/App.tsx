@@ -123,6 +123,14 @@ const App = () => (
               </PublicRoute>
             }
           />
+          <Route
+            path="/client-login"
+            element={
+              <PublicRoute>
+                <LoginPage initialMode="client" />
+              </PublicRoute>
+            }
+          />
 
           <Route
             element={

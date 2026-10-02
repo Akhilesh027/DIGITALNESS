@@ -187,6 +187,12 @@ exports.createDeal = async (req, res) => {
 
     const populatedDeal = await populateDeal(deal._id);
 
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("deal_created", populatedDeal);
+      io.emit("deal_updated", populatedDeal);
+    }
+
     res.status(201).json({
       message: "Deal created successfully",
       deal: populatedDeal,
@@ -334,6 +340,11 @@ exports.updateDeal = async (req, res) => {
     }
 
     const populatedDeal = await populateDeal(deal._id);
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("deal_updated", populatedDeal);
+    }
 
     res.status(200).json({
       message: "Deal updated successfully",

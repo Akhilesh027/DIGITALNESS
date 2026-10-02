@@ -48,10 +48,11 @@ interface Lead {
   nextFollowUpDate: string;
   status: 'New' | 'Demo Completed' | 'Own Close' | 'Own Loss' | 'Follow Up' | 'No Response' | 'Call Back';
   lastContactDate: string;
-  followUpDate?: string;
   inPipeline: boolean;
   notes?: string[];
   callLogs?: CallLog[];
+  proposalId?: any;
+  proposalCreated?: boolean;
 }
 
 interface CRMUser {
@@ -96,6 +97,7 @@ const getCurrentUser = () => {
 };
 
 import { authHeaders, jsonHeaders, getToken } from "@/api/auth";
+import { socket } from "@/lib/socket";
 
 // ==================== Constants ====================
 const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
@@ -681,6 +683,45 @@ export default function LeadsPage() {
       setNewLead(prev => ({ ...prev, branchId: getDefaultBranchId() }));
     }
   }, [branches]);
+
+  // Real-time synchronization with Proposals and Leads across CRM
+  useEffect(() => {
+    if (!socket.connected) {
+      socket.connect();
+    }
+
+    const handleLeadUpdated = (updatedLead: any) => {
+      if (updatedLead?._id) {
+        setLeads((prev) => prev.map((l) => (l._id === updatedLead._id ? { ...l, ...updatedLead } : l)));
+      } else {
+        fetchLeads();
+      }
+    };
+
+    const handleProposalEvent = () => {
+      fetchLeads();
+    };
+
+    socket.on("lead_updated", handleLeadUpdated);
+    socket.on("proposal_created", handleProposalEvent);
+    socket.on("proposal_updated", handleProposalEvent);
+    socket.on("proposal_status_updated", handleProposalEvent);
+
+    const handleWindowSync = () => {
+      fetchLeads();
+    };
+    window.addEventListener("crm_proposal_updated", handleWindowSync);
+    window.addEventListener("crm_lead_updated", handleWindowSync);
+
+    return () => {
+      socket.off("lead_updated", handleLeadUpdated);
+      socket.off("proposal_created", handleProposalEvent);
+      socket.off("proposal_updated", handleProposalEvent);
+      socket.off("proposal_status_updated", handleProposalEvent);
+      window.removeEventListener("crm_proposal_updated", handleWindowSync);
+      window.removeEventListener("crm_lead_updated", handleWindowSync);
+    };
+  }, []);
 
   // ==================== Render ====================
   return (

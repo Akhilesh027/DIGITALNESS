@@ -137,7 +137,7 @@ const MarketingConnectionSchema = new mongoose.Schema(
 );
 
 // Encrypt tokens before saving to database
-MarketingConnectionSchema.pre("save", function (next) {
+MarketingConnectionSchema.pre("save", function () {
   const { encryptToken } = require("../utils/cryptoUtil");
   if (this.isModified("accessToken") && this.accessToken) {
     this.accessToken = encryptToken(this.accessToken);
@@ -145,7 +145,6 @@ MarketingConnectionSchema.pre("save", function (next) {
   if (this.isModified("refreshToken") && this.refreshToken) {
     this.refreshToken = encryptToken(this.refreshToken);
   }
-  next();
 });
 
 // Compound index to prevent duplicate active accounts for same customer, location, and platform account
