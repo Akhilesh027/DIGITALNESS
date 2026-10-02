@@ -125,11 +125,7 @@ const App = () => (
           />
           <Route
             path="/client-login"
-            element={
-              <PublicRoute>
-                <LoginPage initialMode="client" />
-              </PublicRoute>
-            }
+            element={<Navigate to="/" replace />}
           />
 
           <Route
