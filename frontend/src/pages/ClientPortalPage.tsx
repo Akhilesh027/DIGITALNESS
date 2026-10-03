@@ -1617,10 +1617,10 @@ export default function ClientPortalPage() {
                   {count !== null && count > 0 && (
                     <span
                       className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${item.key === "pending"
-                          ? "bg-amber-500 text-slate-950 font-black"
-                          : active === item.key
-                            ? "bg-white/20 text-white"
-                            : "bg-muted text-muted-foreground"
+                        ? "bg-amber-500 text-slate-950 font-black"
+                        : active === item.key
+                          ? "bg-white/20 text-white"
+                          : "bg-muted text-muted-foreground"
                         }`}
                     >
                       {count}

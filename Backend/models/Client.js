@@ -42,7 +42,6 @@ const clientSchema = new mongoose.Schema(
 
     branchId: {
       type: String,
-      enum: ["BR001", "BR002", "BR003"],
       default: "BR001",
     },
 

@@ -46,6 +46,7 @@ exports.createClientLogin = async (req, res) => {
       client.customerId = customer._id;
       if (!client.name) client.name = customer.name;
       client.status = "active";
+      if (customer.branchId) client.branchId = customer.branchId;
       await client.save();
 
       customer.userId = client._id;
