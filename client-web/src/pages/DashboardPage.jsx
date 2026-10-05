@@ -486,13 +486,39 @@ export default function DashboardPage() {
                     </span>
                   </div>
 
+                  {/* Billing settlement breakdown if configured */}
+                  {(proposal.billingConfigured || proposal.billingCycle || isAccepted) && (
+                    <div className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold text-brand-400">
+                          {proposal.billingCycle ? `${proposal.billingCycle} Retainer` : "Agreed Model"}
+                        </span>
+                        {proposal.advancePaid > 0 && (
+                          <span className="text-[10px] text-emerald-400 font-bold">
+                            Advance: {formatCurrency(proposal.advancePaid)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between font-medium">
+                        <span className="text-slate-400">Pending Balance:</span>
+                        <strong className={Number(proposal.balancePending !== undefined ? proposal.balancePending : Math.max(0, proposalValue - (proposal.advancePaid || 0))) > 0 ? "text-amber-400" : "text-emerald-400"}>
+                          {formatCurrency(
+                            proposal.balancePending !== undefined
+                              ? proposal.balancePending
+                              : Math.max(0, proposalValue - (proposal.advancePaid || 0))
+                          )}
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between text-xs text-slate-400 pt-2 border-t border-slate-800/80">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5" />
                       {new Date(proposal.proposalDate || proposal.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
                     </span>
                     <span className="text-base font-black text-white">
-                      {formatCurrency(proposalValue)}
+                      {formatCurrency(proposal.agreedAmount || proposalValue)}
                     </span>
                   </div>
                 </div>

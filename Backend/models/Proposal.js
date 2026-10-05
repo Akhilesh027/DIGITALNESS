@@ -71,6 +71,25 @@ const proposalSchema = new mongoose.Schema(
     proposalValue: { type: Number, default: 0 },
     grandTotal: { type: Number, default: 0 },
 
+    // Billing & Agreement Settlement fields
+    billingCycle: {
+      type: String,
+      enum: ["Monthly", "Project", "Yearly", "One-Time", ""],
+      default: "",
+    },
+    agreedAmount: { type: Number, default: 0 },
+    advancePaid: { type: Number, default: 0 },
+    advancePaymentDate: { type: Date, default: null },
+    advancePaymentMethod: { type: String, default: "UPI" },
+    advancePaymentReference: { type: String, default: "" },
+    advanceNotes: { type: String, default: "" },
+    balancePending: { type: Number, default: 0 },
+    dueDate: { type: Date, default: null },
+    billingConfigured: { type: Boolean, default: false },
+    billingConfiguredAt: { type: Date, default: null },
+    invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: "Invoice", default: null },
+    paymentId: { type: mongoose.Schema.Types.ObjectId, ref: "Payment", default: null },
+
     scopeOfWork: { type: String, default: "" },
     deliverables: { type: String, default: "" },
     timeline: { type: String, default: "" },
@@ -82,6 +101,9 @@ const proposalSchema = new mongoose.Schema(
     customerSignatureUrl: { type: String, default: "" },
     authorizedSignatureUrl: { type: String, default: "" },
     companyStampUrl: { type: String, default: "" },
+
+    documentUrl: { type: String, default: "" },
+    documentName: { type: String, default: "" },
 
     attachments: { type: [attachmentSchema], default: [] },
 

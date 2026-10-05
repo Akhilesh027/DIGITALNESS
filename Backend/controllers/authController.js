@@ -112,6 +112,7 @@ exports.registerUser = async (req, res) => {
       phone,
       alternatePhone,
       role,
+      roles,
       department,
       designation,
       salary,
@@ -130,7 +131,12 @@ exports.registerUser = async (req, res) => {
       notes,
     } = req.body;
 
-    if (!name || !email || !password || !phone || !role || !department) {
+    const normalizedRoles = Array.isArray(roles) && roles.length > 0
+      ? Array.from(new Set(roles.filter(Boolean)))
+      : role ? [role] : [];
+    const primaryRole = normalizedRoles[0] || role || "";
+
+    if (!name || !email || !password || !phone || !primaryRole || !department) {
       return res.status(400).json({
         message: "Name, email, password, phone, role and department are required",
       });
@@ -163,7 +169,8 @@ exports.registerUser = async (req, res) => {
       password,
       phone,
       alternatePhone,
-      role,
+      role: primaryRole,
+      roles: normalizedRoles,
       department,
       designation,
       salary: Number(salary) || 0,
@@ -422,8 +429,20 @@ exports.updateUser = async (req, res) => {
         .filter(Boolean);
     }
 
+    if (updates.roles !== undefined) {
+      if (Array.isArray(updates.roles)) {
+        updates.roles = Array.from(new Set(updates.roles.filter(Boolean)));
+        if (updates.roles.length > 0) {
+          updates.role = updates.roles[0];
+        }
+      }
+    } else if (updates.role) {
+      updates.roles = [updates.role];
+    }
+
     if (!ADMIN_ROLES.includes(req.user.role)) {
       delete updates.role;
+      delete updates.roles;
       delete updates.salary;
       delete updates.bankDetails;
       updates.branchId = req.user.branchId;

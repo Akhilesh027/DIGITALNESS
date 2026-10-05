@@ -1828,6 +1828,21 @@ export default function ClientPortalPage() {
                             </td>
                             <td className="p-3.5 text-right">
                               <div className="flex items-center justify-end gap-2">
+                                {(prop.documentUrl || prop.attachments?.[0]?.fileUrl) && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const doc = prop.documentUrl || prop.attachments?.[0]?.fileUrl;
+                                      const fullUrl = doc.startsWith("http") ? doc : `${API_URL.replace("/api", "")}${doc}`;
+                                      window.open(fullUrl, "_blank");
+                                    }}
+                                    className="h-8 text-xs gap-1 text-primary border-primary/30 font-semibold"
+                                  >
+                                    <FileDown className="h-3.5 w-3.5" />
+                                    <span>Doc</span>
+                                  </Button>
+                                )}
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1837,7 +1852,7 @@ export default function ClientPortalPage() {
                                   <Eye className="h-3.5 w-3.5" />
                                   <span>View Details</span>
                                 </Button>
-                                {prop.status === "Sent" && (
+                                {!isAccepted && (
                                   <Button
                                     size="sm"
                                     onClick={() => handleAcceptProposal(prop._id)}
@@ -1849,7 +1864,7 @@ export default function ClientPortalPage() {
                                     ) : (
                                       <CheckCircle2 className="h-3.5 w-3.5" />
                                     )}
-                                    <span>Accept</span>
+                                    <span>Approve</span>
                                   </Button>
                                 )}
                               </div>
@@ -3519,11 +3534,43 @@ export default function ClientPortalPage() {
                 </div>
               )}
 
+              {/* Official Agreement Document Section */}
+              {(selectedProposal.documentUrl || selectedProposal.attachments?.[0]?.fileUrl) && (
+                <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                      <FileText className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-foreground">
+                        {selectedProposal.documentName || "Official Agreement Document"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Uploaded by agency for review and digital sign-off
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const doc = selectedProposal.documentUrl || selectedProposal.attachments?.[0]?.fileUrl;
+                      const fullUrl = doc.startsWith("http") ? doc : `${API_URL.replace("/api", "")}${doc}`;
+                      window.open(fullUrl, "_blank");
+                    }}
+                    className="gap-1.5 text-xs text-primary border-primary/40"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    <span>View / Download Document</span>
+                  </Button>
+                </div>
+              )}
+
               <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-2">
                 <Button variant="outline" onClick={() => setSelectedProposal(null)}>
                   Close
                 </Button>
-                {selectedProposal.status === "Sent" && (
+                {!["Approved", "Accepted"].includes(selectedProposal.status) && (
                   <Button
                     onClick={() => {
                       handleAcceptProposal(selectedProposal._id);
@@ -3532,7 +3579,7 @@ export default function ClientPortalPage() {
                     className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5"
                   >
                     <CheckCircle2 className="h-4 w-4" />
-                    <span>Accept Proposal</span>
+                    <span>Approve Agreement</span>
                   </Button>
                 )}
               </DialogFooter>

@@ -79,6 +79,11 @@ const userSchema = new mongoose.Schema(
       default: "Graphic Designer",
     },
 
+    roles: {
+      type: [String],
+      default: [],
+    },
+
     department: {
       type: String,
       default: "Creative",

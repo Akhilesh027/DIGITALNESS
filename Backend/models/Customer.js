@@ -139,6 +139,10 @@ const customerSchema = new mongoose.Schema(
       default: [],
     },
 
+    billingCycle: { type: String, default: "" },
+    contractValue: { type: Number, default: 0 },
+    advancePaid: { type: Number, default: 0 },
+    balancePending: { type: Number, default: 0 },
     totalPaid: { type: Number, default: 0 },
     totalPending: { type: Number, default: 0 },
 

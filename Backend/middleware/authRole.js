@@ -8,7 +8,14 @@ exports.authorize = (...roles) => {
         });
       }
 
-      if (!roles.includes(req.user.role)) {
+      const userRoles = [
+        req.user.role,
+        ...(Array.isArray(req.user.roles) ? req.user.roles : []),
+      ].filter(Boolean);
+
+      const hasPermission = roles.some((role) => userRoles.includes(role));
+
+      if (!hasPermission) {
         return res.status(403).json({
           success: false,
           message: "Access denied",

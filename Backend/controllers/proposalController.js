@@ -2,6 +2,8 @@ const Proposal = require("../models/Proposal.js");
 const Customer = require("../models/Customer.js");
 const Deal = require("../models/Deal.js");
 const Lead = require("../models/Lead.js");
+const Invoice = require("../models/Invoice.js");
+const Payment = require("../models/Payment.js");
 const Notification = require("../models/Notification.js");
 const sendMail = require("../utils/sendMail");
 
@@ -57,6 +59,8 @@ const populateProposal = (query) => {
     .populate("dealId")
     .populate("leadId")
     .populate("customerId")
+    .populate("invoiceId")
+    .populate("paymentId")
     .populate("assignedTo", "name email phone role department branchId")
     .populate("createdBy", "name email role branchId");
 };
@@ -511,16 +515,56 @@ exports.createProposal = async (req, res) => {
       proposalNumber = await generateProposalNumber();
     }
 
+    let customerRecord = null;
+    if (req.body.customerId) {
+      customerRecord = await Customer.findById(req.body.customerId);
+    }
+
     const proposalData = normalizeProposalPayload({
       ...req.body,
+      customerName: req.body.customerName || customerRecord?.name || "",
+      companyName: req.body.companyName || customerRecord?.companyName || "",
+      contactNumber: req.body.contactNumber || (Array.isArray(customerRecord?.contactNumbers) ? customerRecord.contactNumbers[0] : customerRecord?.contactNumber) || "",
+      clientEmail: req.body.clientEmail || customerRecord?.email || "",
+      email: req.body.email || customerRecord?.email || "",
+      businessType: req.body.businessType || customerRecord?.businessType || "",
+      branchId: req.body.branchId || customerRecord?.branchId || req.user?.branchId || "",
       proposalNumber,
       mailSent: false,
       createdBy: userId,
       assignedTo: req.body.assignedTo || userId,
     });
 
+    if (req.file) {
+      const docUrl = `/uploads/proposals/${req.file.filename}`;
+      proposalData.documentUrl = docUrl;
+      proposalData.documentName = req.file.originalname;
+      const docAttachment = {
+        fileName: req.file.originalname,
+        fileUrl: docUrl,
+        fileType: req.file.mimetype,
+        uploadedAt: new Date(),
+      };
+      proposalData.attachments = [docAttachment, ...(proposalData.attachments || [])];
+    } else if (proposalData.documentUrl && (!proposalData.attachments || proposalData.attachments.length === 0)) {
+      proposalData.attachments = [
+        {
+          fileName: proposalData.documentName || "Agreement Document",
+          fileUrl: proposalData.documentUrl,
+          fileType: "application/pdf",
+          uploadedAt: new Date(),
+        },
+      ];
+    }
+
     if (!proposalData.customerName && proposalData.clientName) {
       proposalData.customerName = proposalData.clientName;
+    }
+
+    if (!proposalData.title) {
+      proposalData.title = proposalData.customerName
+        ? `${proposalData.customerName} - Client Service Agreement`
+        : "Client Service Agreement";
     }
 
     if (!proposalData.branchId) {
@@ -920,6 +964,257 @@ exports.updateProposalStatus = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to update proposal status",
+      error: error.message,
+    });
+  }
+};
+
+exports.configureProposalBilling = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      billingCycle, // "Monthly" | "Project" | "Yearly"
+      agreedAmount,
+      advancePaid,
+      advancePaymentDate,
+      advancePaymentMethod,
+      advancePaymentReference,
+      advanceNotes,
+      dueDate,
+    } = req.body;
+
+    const proposal = await Proposal.findById(id);
+    if (!proposal) {
+      return res.status(404).json({ success: false, message: "Proposal not found" });
+    }
+
+    const proposalVal = Number(proposal.grandTotal || proposal.proposalValue || 0);
+    const finalAgreedAmount = Math.max(
+      0,
+      Number(agreedAmount !== undefined && agreedAmount !== null && agreedAmount !== "" ? agreedAmount : proposalVal)
+    );
+    const finalAdvancePaid = Math.max(0, Number(advancePaid || 0));
+    const finalBalancePending = Math.max(0, finalAgreedAmount - finalAdvancePaid);
+    const finalBillingCycle = ["Monthly", "Project", "Yearly", "One-Time"].includes(billingCycle)
+      ? billingCycle
+      : "Project";
+    const finalDueDate = dueDate
+      ? new Date(dueDate)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const finalAdvanceDate = advancePaymentDate ? new Date(advancePaymentDate) : new Date();
+    const finalAdvanceMethod = advancePaymentMethod || "UPI";
+    const finalAdvanceRef = advancePaymentReference || `ADV-${Date.now().toString().slice(-6)}`;
+
+    // Set proposal status to Approved if not already accepted/approved
+    if (proposal.status !== "Accepted") {
+      proposal.status = "Approved";
+    }
+    if (!proposal.approvedAt) {
+      proposal.approvedAt = new Date();
+    }
+
+    // Find or create customer
+    const email = getProposalEmail(proposal);
+    const contactNumber = proposal.contactNumber;
+    let customer = null;
+
+    if (proposal.customerId) {
+      customer = await Customer.findById(proposal.customerId);
+    }
+    if (!customer && email) {
+      customer = await Customer.findOne({ email });
+    }
+    if (!customer && contactNumber) {
+      customer = await Customer.findOne({ contactNumbers: contactNumber });
+    }
+
+    if (!customer) {
+      customer = await Customer.create({
+        name: proposal.customerName || proposal.clientName || "Client",
+        companyName: proposal.companyName || "",
+        businessType: proposal.businessType || "General",
+        contactNumbers: proposal.contactNumber ? [proposal.contactNumber] : ["0000000000"],
+        email,
+        branchId: proposal.branchId || req.user?.branchId || "",
+        assignedTo: proposal.assignedTo,
+        leadId: proposal.leadId,
+        package: `${finalBillingCycle} - ${proposal.title || "Agreed Services"}`,
+        billingCycle: finalBillingCycle,
+        contractValue: finalAgreedAmount,
+        advancePaid: finalAdvancePaid,
+        balancePending: finalBalancePending,
+        totalPaid: finalAdvancePaid,
+        totalPending: finalBalancePending,
+        status: "Active",
+        createdBy: getUserId(req.user),
+        activityLogs: [
+          {
+            title: "Customer Created & Billing Configured",
+            message: `${finalBillingCycle} billing configured: Agreed ₹${finalAgreedAmount.toLocaleString("en-IN")}, Advance ₹${finalAdvancePaid.toLocaleString("en-IN")}, Pending ₹${finalBalancePending.toLocaleString("en-IN")}`,
+            type: "proposal",
+            createdBy: getUserId(req.user),
+          },
+        ],
+      });
+    } else {
+      customer.billingCycle = finalBillingCycle;
+      customer.contractValue = finalAgreedAmount;
+      customer.advancePaid = (customer.advancePaid || 0) + finalAdvancePaid;
+      customer.balancePending = finalBalancePending;
+      customer.totalPaid = (customer.totalPaid || 0) + finalAdvancePaid;
+      customer.totalPending = (customer.totalPending || 0) + finalBalancePending;
+      if (customer.activityLogs) {
+        customer.activityLogs.push({
+          title: "Billing Configured from Proposal",
+          message: `${finalBillingCycle} billing configured: Agreed ₹${finalAgreedAmount.toLocaleString("en-IN")}, Advance ₹${finalAdvancePaid.toLocaleString("en-IN")}, Pending ₹${finalBalancePending.toLocaleString("en-IN")}`,
+          type: "proposal",
+          createdBy: getUserId(req.user),
+        });
+      }
+      await customer.save();
+    }
+
+    proposal.customerId = customer._id;
+    proposal.customerCreated = true;
+
+    // Create or update Invoice
+    let invoice = null;
+    if (proposal.invoiceId) {
+      invoice = await Invoice.findById(proposal.invoiceId);
+    }
+    if (!invoice && proposal.proposalNumber) {
+      invoice = await Invoice.findOne({ invoiceNumber: `INV-${proposal.proposalNumber}` });
+    }
+
+    const invoiceStatus = finalBalancePending === 0 ? "PAID" : (finalAdvancePaid > 0 ? "PARTIALLY_PAID" : "UNPAID");
+
+    if (invoice) {
+      invoice.originalAmount = finalAgreedAmount;
+      invoice.paidAmount = finalAdvancePaid;
+      invoice.balanceAmount = finalBalancePending;
+      invoice.paymentStatus = invoiceStatus;
+      invoice.dueDate = finalDueDate;
+      invoice.notes = `${finalBillingCycle} Agreement Billing. Agreed ₹${finalAgreedAmount}. Advance Paid: ₹${finalAdvancePaid}. Balance Due: ₹${finalBalancePending}.`;
+      await invoice.save();
+    } else {
+      invoice = await Invoice.create({
+        invoiceNumber: `INV-${proposal.proposalNumber || Date.now().toString().slice(-6)}`,
+        customer: customer._id,
+        originalAmount: finalAgreedAmount,
+        paidAmount: finalAdvancePaid,
+        balanceAmount: finalBalancePending,
+        paymentStatus: invoiceStatus,
+        dueDate: finalDueDate,
+        items: [
+          {
+            description: `${finalBillingCycle} Agreement - ${proposal.title || "Agency Marketing Services"}`,
+            quantity: 1,
+            unitPrice: finalAgreedAmount,
+            total: finalAgreedAmount,
+          },
+        ],
+        notes: `${finalBillingCycle} Agreement Billing. Agreed ₹${finalAgreedAmount}. Advance Paid: ₹${finalAdvancePaid}. Balance Due: ₹${finalBalancePending}.`,
+        documentUrl: proposal.documentUrl || "",
+        documentName: proposal.documentName || "",
+        createdBy: getUserId(req.user),
+      });
+    }
+
+    proposal.invoiceId = invoice._id;
+
+    // Record advance payment if > 0
+    let payment = null;
+    if (finalAdvancePaid > 0) {
+      if (proposal.paymentId) {
+        payment = await Payment.findById(proposal.paymentId);
+      }
+      if (payment) {
+        payment.amount = finalAdvancePaid;
+        payment.paidAmount = finalAdvancePaid;
+        payment.date = finalAdvanceDate;
+        payment.paymentDate = finalAdvanceDate;
+        payment.method = finalAdvanceMethod;
+        payment.reference = finalAdvanceRef;
+        payment.referenceId = finalAdvanceRef;
+        payment.notes = advanceNotes || `Advance payment received for proposal ${proposal.proposalNumber} (${finalBillingCycle})`;
+        await payment.save();
+      } else {
+        payment = await Payment.create({
+          customer: customer._id,
+          invoice: invoice._id,
+          amount: finalAdvancePaid,
+          paidAmount: finalAdvancePaid,
+          date: finalAdvanceDate,
+          paymentDate: finalAdvanceDate,
+          method: finalAdvanceMethod,
+          reference: finalAdvanceRef,
+          referenceId: finalAdvanceRef,
+          status: "Completed",
+          notes: advanceNotes || `Advance payment received for proposal ${proposal.proposalNumber} (${finalBillingCycle})`,
+          receiptUrl: proposal.documentUrl || "",
+          receiptName: proposal.documentName || "",
+          recordedBy: getUserId(req.user),
+        });
+      }
+      proposal.paymentId = payment._id;
+    }
+
+    // Update proposal billing fields
+    proposal.billingCycle = finalBillingCycle;
+    proposal.agreedAmount = finalAgreedAmount;
+    proposal.advancePaid = finalAdvancePaid;
+    proposal.advancePaymentDate = finalAdvanceDate;
+    proposal.advancePaymentMethod = finalAdvanceMethod;
+    proposal.advancePaymentReference = finalAdvanceRef;
+    proposal.advanceNotes = advanceNotes || "";
+    proposal.balancePending = finalBalancePending;
+    proposal.dueDate = finalDueDate;
+    proposal.billingConfigured = true;
+    proposal.billingConfiguredAt = new Date();
+
+    proposal.activityLogs.push({
+      title: "Client Billing Configured",
+      message: `${finalBillingCycle} billing configured: Agreed ₹${finalAgreedAmount.toLocaleString("en-IN")}, Advance Paid ₹${finalAdvancePaid.toLocaleString("en-IN")}, Pending Due ₹${finalBalancePending.toLocaleString("en-IN")}`,
+      type: "system",
+      createdBy: getUserId(req.user),
+    });
+
+    if (proposal.dealId) {
+      await Deal.findByIdAndUpdate(proposal.dealId, {
+        customerCreated: true,
+        customerId: customer._id,
+        stage: "Won",
+        dealValue: finalAgreedAmount,
+      });
+    }
+
+    await proposal.save();
+
+    const populatedProposal = await populateProposal(Proposal.findById(proposal._id));
+
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("proposal_updated", populatedProposal);
+      io.emit("proposal_status_updated", populatedProposal);
+      io.emit("invoice_created", invoice);
+      if (payment) io.emit("payment_created", payment);
+      io.emit("crm_update", { type: "proposal", action: "billing_configured", id: proposal._id });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Billing successfully configured for ${proposal.customerName || "client"} (${finalBillingCycle})`,
+      data: {
+        proposal: populatedProposal,
+        invoice,
+        payment,
+      },
+    });
+  } catch (error) {
+    console.error("Configure proposal billing error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to configure proposal billing",
       error: error.message,
     });
   }

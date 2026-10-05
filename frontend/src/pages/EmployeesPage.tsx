@@ -24,6 +24,7 @@ import {
   Download,
   UploadCloud,
   X,
+  Check,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,7 @@ interface Employee {
   employeeId?: string;
   name: string;
   role: string;
+  roles?: string[];
   department: string;
   designation?: string;
   phone: string;
@@ -102,6 +104,7 @@ interface EmployeeForm {
   employeeId: string;
   name: string;
   role: string;
+  roles: string[];
   department: string;
   designation: string;
   phone: string;
@@ -134,6 +137,7 @@ const emptyEmployee: EmployeeForm = {
   employeeId: "",
   name: "",
   role: "",
+  roles: [],
   department: "Sales",
   designation: "",
   phone: "",
@@ -411,9 +415,10 @@ export default function EmployeesPage() {
   ]);
 
   const validateForm = (isEdit: boolean) => {
+    const hasRole = (formData.roles && formData.roles.length > 0) || formData.role;
     if (
       !formData.name.trim() ||
-      !formData.role ||
+      !hasRole ||
       !formData.department ||
       !formData.designation.trim() ||
       !formData.phone.trim() ||
@@ -442,10 +447,19 @@ export default function EmployeesPage() {
   };
 
   const buildPayload = (isEdit: boolean) => {
+    const assignedRoles =
+      formData.roles && formData.roles.length > 0
+        ? formData.roles
+        : formData.role
+          ? [formData.role]
+          : [];
+    const primaryRole = assignedRoles[0] || formData.role || "Support";
+
     const payload: any = {
       employeeId: formData.employeeId.trim(),
       name: formData.name.trim(),
-      role: formData.role,
+      role: primaryRole,
+      roles: assignedRoles,
       department: formData.department,
       designation: formData.designation.trim(),
       phone: formData.phone.trim(),
@@ -588,10 +602,18 @@ export default function EmployeesPage() {
 
   const openEditModal = (emp: Employee) => {
     setEditingEmployee(emp);
+    const empRoles =
+      Array.isArray(emp.roles) && emp.roles.length > 0
+        ? emp.roles
+        : emp.role
+          ? [emp.role]
+          : [];
+
     setFormData({
       employeeId: emp.employeeId || "",
       name: emp.name || "",
-      role: emp.role || "",
+      role: emp.role || empRoles[0] || "",
+      roles: empRoles,
       department: emp.department || "Sales",
       designation: emp.designation || emp.role || "",
       phone: emp.phone || "",
@@ -744,27 +766,68 @@ export default function EmployeesPage() {
       </div>
 
       <div className="rounded-2xl border border-border bg-muted/30 p-4">
-        <div className="mb-3 flex items-center gap-2 font-semibold">
-          <Shield className="h-4 w-4" /> Role, Branch & Access
+        <div className="mb-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-semibold">
+            <Shield className="h-4 w-4" /> Role, Branch & Access
+          </div>
+          <span className="text-xs text-muted-foreground font-medium">
+            {(formData.roles?.length || (formData.role ? 1 : 0))} role(s) selected
+          </span>
+        </div>
+
+        {/* Multi-role selection */}
+        <div className="mb-4 space-y-2">
+          <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+            <span>Assign Employee Roles (Select Multiple) *</span>
+            <span className="text-[11px] text-primary font-normal">Click tags to toggle</span>
+          </label>
+          <div className="flex flex-wrap gap-2 p-3 rounded-xl border bg-background/80">
+            {roles.map((role) => {
+              const isSelected =
+                formData.roles?.includes(role) ||
+                (!formData.roles?.length && formData.role === role);
+              return (
+                <button
+                  key={role}
+                  type="button"
+                  onClick={() => {
+                    const current =
+                      formData.roles && formData.roles.length > 0
+                        ? [...formData.roles]
+                        : formData.role
+                          ? [formData.role]
+                          : [];
+                    let next: string[];
+                    if (current.includes(role)) {
+                      next = current.filter((r) => r !== role);
+                    } else {
+                      next = [...current, role];
+                    }
+                    setFormData({
+                      ...formData,
+                      roles: next,
+                      role: next[0] || "",
+                    });
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${isSelected
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm font-semibold"
+                      : "bg-muted/40 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                    }`}
+                >
+                  {isSelected && <Check className="w-3.5 h-3.5" />}
+                  {role}
+                </button>
+              );
+            })}
+          </div>
+          {(!formData.roles || formData.roles.length === 0) && !formData.role && (
+            <p className="text-xs text-amber-500 font-medium">
+              Please click at least one role to assign to this employee.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Select
-            value={formData.role}
-            onValueChange={(v) => setFormData({ ...formData, role: v })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select role *" />
-            </SelectTrigger>
-            <SelectContent>
-              {roles.map((role) => (
-                <SelectItem key={role} value={role}>
-                  {role}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <Select
             value={formData.department}
             onValueChange={(v) => setFormData({ ...formData, department: v })}
@@ -1358,15 +1421,26 @@ export default function EmployeesPage() {
                 </Badge>
               </div>
 
-              <div className="mb-4 flex flex-wrap gap-2">
+              <div className="mb-4 flex flex-wrap gap-1.5">
                 {employee.employeeId && (
                   <Badge variant="outline">
                     <IdCard className="mr-1 h-3 w-3" />
                     {employee.employeeId}
                   </Badge>
                 )}
-                <Badge variant="secondary">{employee.role}</Badge>
-                <Badge variant="secondary">{employee.department}</Badge>
+                {(employee.roles && employee.roles.length > 0
+                  ? employee.roles
+                  : [employee.role]
+                ).map((r) => (
+                  <Badge
+                    key={r}
+                    variant="secondary"
+                    className="bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
+                  >
+                    {r}
+                  </Badge>
+                ))}
+                <Badge variant="outline">{employee.department}</Badge>
               </div>
 
               <div className="mb-4 space-y-2">
@@ -1486,8 +1560,17 @@ export default function EmployeesPage() {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <div className="rounded-xl bg-muted/50 p-4">
-                  <p className="text-sm text-muted-foreground">Role</p>
-                  <p className="text-lg font-bold">{selectedEmpData.role}</p>
+                  <p className="text-sm text-muted-foreground">Assigned Roles</p>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {(selectedEmpData.roles && selectedEmpData.roles.length > 0
+                      ? selectedEmpData.roles
+                      : [selectedEmpData.role]
+                    ).map((r) => (
+                      <Badge key={r} variant="secondary" className="bg-primary/10 text-primary text-xs">
+                        {r}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="rounded-xl bg-muted/50 p-4">
@@ -1560,6 +1643,13 @@ export default function EmployeesPage() {
                   <h4 className="mb-3 font-semibold">Employment Information</h4>
                   <div className="space-y-2 text-sm">
                     <p><b>Employee ID:</b> {selectedEmpData.employeeId || "N/A"}</p>
+                    <p>
+                      <b>Roles:</b>{" "}
+                      {(selectedEmpData.roles && selectedEmpData.roles.length > 0
+                        ? selectedEmpData.roles
+                        : [selectedEmpData.role]
+                      ).join(", ")}
+                    </p>
                     <p><b>Designation:</b> {selectedEmpData.designation || "N/A"}</p>
                     <p><b>Department:</b> {selectedEmpData.department || "N/A"}</p>
                     <p><b>Branch:</b> {branchName(selectedEmpData.branchId)}</p>

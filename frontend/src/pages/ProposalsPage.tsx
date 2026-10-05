@@ -26,6 +26,16 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
+  UploadCloud,
+  FileUp,
+  Building2,
+  Phone,
+  Mail,
+  X,
+  Wallet,
+  CreditCard,
+  CalendarDays,
+  Check,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -136,6 +146,8 @@ interface Proposal {
   approvedAt?: string;
   rejectedAt?: string;
   validUntil?: string;
+  documentUrl?: string;
+  documentName?: string;
   attachments?: ProposalAttachment[];
   customerSignatureUrl?: string;
   authorizedSignatureUrl?: string;
@@ -145,6 +157,22 @@ interface Proposal {
   companyStamp?: string;
   activityLogs?: ProposalActivity[];
   customerCreated?: boolean;
+
+  // Billing & Agreement Settlement fields
+  billingCycle?: "Monthly" | "Project" | "Yearly" | "One-Time" | string;
+  agreedAmount?: number;
+  advancePaid?: number;
+  advancePaymentDate?: string;
+  advancePaymentMethod?: string;
+  advancePaymentReference?: string;
+  advanceNotes?: string;
+  balancePending?: number;
+  dueDate?: string;
+  billingConfigured?: boolean;
+  billingConfiguredAt?: string;
+  invoiceId?: any;
+  paymentId?: any;
+
   createdAt?: string;
   updatedAt?: string;
 }
@@ -413,6 +441,8 @@ const blankForm = {
   notes: "",
   mailSubject: "",
   mailMessage: "",
+  documentUrl: "",
+  documentName: "",
   status: "Draft" as ProposalStatus,
 };
 
@@ -740,6 +770,9 @@ export default function ProposalsPage() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
   const [dealsLoading, setDealsLoading] = useState(false);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
+  const [agreementFile, setAgreementFile] = useState<File | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [open, setOpen] = useState(false);
@@ -751,6 +784,95 @@ export default function ProposalsPage() {
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState("");
   const [versioningId, setVersioningId] = useState("");
+
+  // Billing configuration modal state
+  const [billingModalOpen, setBillingModalOpen] = useState(false);
+  const [billingProposal, setBillingProposal] = useState<Proposal | null>(null);
+  const [billingForm, setBillingForm] = useState({
+    billingCycle: "Project",
+    agreedAmount: "",
+    advancePaid: "0",
+    advancePaymentDate: new Date().toISOString().split("T")[0],
+    advancePaymentMethod: "UPI",
+    advancePaymentReference: "",
+    advanceNotes: "",
+    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+  });
+  const [savingBilling, setSavingBilling] = useState(false);
+
+  const openBillingModal = (proposal: Proposal) => {
+    setBillingProposal(proposal);
+    const proposalVal = Number(proposal.grandTotal || proposal.proposalValue || 0);
+    const existingAgreed = proposal.agreedAmount !== undefined && proposal.agreedAmount > 0
+      ? String(proposal.agreedAmount)
+      : String(proposalVal);
+    const existingAdvance = proposal.advancePaid !== undefined
+      ? String(proposal.advancePaid)
+      : "0";
+    const existingDueDate = proposal.dueDate
+      ? new Date(proposal.dueDate).toISOString().split("T")[0]
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    const existingAdvanceDate = proposal.advancePaymentDate
+      ? new Date(proposal.advancePaymentDate).toISOString().split("T")[0]
+      : new Date().toISOString().split("T")[0];
+
+    setBillingForm({
+      billingCycle: proposal.billingCycle || "Project",
+      agreedAmount: existingAgreed,
+      advancePaid: existingAdvance,
+      advancePaymentDate: existingAdvanceDate,
+      advancePaymentMethod: proposal.advancePaymentMethod || "UPI",
+      advancePaymentReference: proposal.advancePaymentReference || "",
+      advanceNotes: proposal.advanceNotes || "",
+      dueDate: existingDueDate,
+    });
+    setBillingModalOpen(true);
+  };
+
+  const handleSaveBilling = async () => {
+    if (!billingProposal) return;
+    try {
+      setSavingBilling(true);
+      const proposalId = getItemId(billingProposal);
+      const res = await fetch(`${API_URL}/proposals/${proposalId}/configure-billing`, {
+        method: "POST",
+        ...getAuthConfig(),
+        body: JSON.stringify({
+          billingCycle: billingForm.billingCycle,
+          agreedAmount: Number(billingForm.agreedAmount || 0),
+          advancePaid: Number(billingForm.advancePaid || 0),
+          advancePaymentDate: billingForm.advancePaymentDate,
+          advancePaymentMethod: billingForm.advancePaymentMethod,
+          advancePaymentReference: billingForm.advancePaymentReference,
+          advanceNotes: billingForm.advanceNotes,
+          dueDate: billingForm.dueDate,
+        }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.message || "Failed to configure billing");
+
+      const updated = data.data?.proposal || data.proposal || data.data || data;
+      setProposals((prev) => prev.map((p) => (getItemId(p) === proposalId ? updated : p)));
+      if (previewProposal && getItemId(previewProposal) === proposalId) {
+        setPreviewProposal(updated);
+      }
+      toast({
+        title: "Client Billing Configured! 🎉",
+        description: `${billingForm.billingCycle} billing successfully configured. Invoice generated & reflected to Client Portal.`,
+      });
+      setBillingModalOpen(false);
+      window.dispatchEvent(new CustomEvent("crm_proposal_updated", { detail: updated }));
+      fetchProposals();
+    } catch (err: any) {
+      toast({
+        title: "Configuration Failed",
+        description: err.message || "Could not configure billing",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingBilling(false);
+    }
+  };
 
   const fetchProposals = async () => {
     try {
@@ -766,6 +888,24 @@ export default function ProposalsPage() {
       toast({ title: "Error", description: error.message || "Failed to fetch proposals", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCustomers = async () => {
+    try {
+      setCustomersLoading(true);
+      const res = await fetch(`${API_URL}/customers`, {
+        method: "GET",
+        ...getAuthConfig(),
+      });
+      const data = await safeJson(res);
+      if (res.ok) {
+        setCustomers(getArrayData(data));
+      }
+    } catch (error: any) {
+      console.warn("Fetch customers error:", error.message);
+    } finally {
+      setCustomersLoading(false);
     }
   };
 
@@ -794,6 +934,7 @@ export default function ProposalsPage() {
   useEffect(() => {
     fetchProposals();
     fetchDeals();
+    fetchCustomers();
 
     const urlParams = new URLSearchParams(window.location.search);
     const searchParam = urlParams.get("search");
@@ -953,8 +1094,57 @@ export default function ProposalsPage() {
     }));
   };
 
+  const handleClientSelect = (customerId: string) => {
+    if (customerId === "manual") {
+      setForm((prev) => ({
+        ...prev,
+        customerId: "",
+        customerName: "",
+        companyName: "",
+        contactNumber: "",
+        clientEmail: "",
+        businessType: "",
+        branchId: "",
+        title: "",
+      }));
+      return;
+    }
+
+    const selectedCust = customers.find(
+      (c) => (c._id || c.id) === customerId
+    );
+    if (!selectedCust) return;
+
+    const custName = selectedCust.name || selectedCust.companyName || "";
+    const phone =
+      (Array.isArray(selectedCust.contactNumbers) && selectedCust.contactNumbers[0]) ||
+      selectedCust.phone ||
+      selectedCust.contactNumber ||
+      "";
+    const email = selectedCust.email || "";
+    const company = selectedCust.companyName || selectedCust.name || "";
+    const bType = selectedCust.businessType || "";
+    const branch = selectedCust.branchId || "";
+
+    setForm((prev) => ({
+      ...prev,
+      customerId,
+      customerName: custName,
+      companyName: company,
+      contactNumber: phone,
+      clientEmail: email,
+      businessType: bType,
+      branchId: branch,
+      title: `${custName} - Client Service Agreement`,
+      status: "Sent",
+      mailSubject: `Agreement & Project Proposal for ${custName} - Digitalness`,
+      mailMessage: `Dear ${custName},\n\nPlease review your service agreement document prepared by Digitalness. Kindly review and approve via your Client Portal.\n\nRegards,\nDigitalness Team`,
+    }));
+  };
+
   const openCreate = () => {
     resetForm();
+    setAgreementFile(null);
     setOpen(true);
   };
 
@@ -1150,17 +1340,55 @@ export default function ProposalsPage() {
 
   const handleSave = async () => {
     try {
-      if (!form.customerName.trim() || !form.contactNumber.trim() || !form.title.trim()) {
-        toast({ title: "Missing fields", description: "Client name, contact number and proposal title are required", variant: "destructive" });
-        return;
-      }
-      if (form.clientEmail.trim() && !isValidEmail(form.clientEmail.trim())) {
-        toast({ title: "Invalid email", description: "Please enter a valid client email", variant: "destructive" });
+      if (!form.customerName.trim()) {
+        toast({ title: "Select Client", description: "Please select a client to create the agreement proposal", variant: "destructive" });
         return;
       }
 
       setSaving(true);
+      let uploadedDocUrl = form.documentUrl || "";
+      let uploadedDocName = form.documentName || "";
+
+      // If a new agreement file was chosen, upload it to the backend
+      if (agreementFile) {
+        const formData = new FormData();
+        formData.append("document", agreementFile);
+
+        const token =
+          localStorage.getItem("token") ||
+          localStorage.getItem("authToken") ||
+          localStorage.getItem("accessToken");
+
+        const uploadRes = await fetch(`${API_URL}/proposals/upload-document`, {
+          method: "POST",
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+          body: formData,
+        });
+
+        const uploadData = await safeJson(uploadRes);
+        if (uploadRes.ok && uploadData.fileUrl) {
+          uploadedDocUrl = uploadData.fileUrl;
+          uploadedDocName = uploadData.fileName || agreementFile.name;
+        } else {
+          throw new Error(uploadData.message || "Failed to upload agreement document");
+        }
+      }
+
       const payload = buildPayload();
+      payload.documentUrl = uploadedDocUrl;
+      payload.documentName = uploadedDocName;
+
+      if (uploadedDocUrl) {
+        const docAtt = {
+          fileName: uploadedDocName || "Agreement Document",
+          fileUrl: uploadedDocUrl,
+          fileType: agreementFile?.type || "application/pdf",
+          uploadedAt: new Date().toISOString(),
+        };
+        const existingAtts = Array.isArray(payload.attachments) ? payload.attachments : [];
+        payload.attachments = [docAtt, ...existingAtts.filter((a: any) => a.fileUrl !== uploadedDocUrl)];
+      }
+
       const proposalId = editing ? getItemId(editing) : "";
       const url = editing ? `${API_URL}/proposals/${proposalId}` : `${API_URL}/proposals`;
 
@@ -1178,13 +1406,14 @@ export default function ProposalsPage() {
       } else {
         setProposals((prev) => [savedProposal, ...prev]);
       }
-      toast({ title: "Saved successfully", description: "Proposal data saved and synchronized across CRM" });
+      toast({ title: "Agreement Saved & Sent", description: "Agreement uploaded and reflected to client portal for approval." });
       window.dispatchEvent(new CustomEvent("crm_proposal_updated", { detail: savedProposal }));
       window.dispatchEvent(new CustomEvent("crm_deal_updated", { detail: savedProposal.dealId }));
       window.dispatchEvent(new CustomEvent("crm_lead_updated", { detail: savedProposal.leadId }));
       fetchProposals();
       setOpen(false);
       resetForm();
+      setAgreementFile(null);
     } catch (error: any) {
       toast({ title: "Save failed", description: error.message || "Failed to save proposal", variant: "destructive" });
     } finally {
@@ -1193,6 +1422,10 @@ export default function ProposalsPage() {
   };
 
   const handleStatusChange = async (proposal: Proposal, status: ProposalStatus) => {
+    if (status === "Approved" || status === "Accepted") {
+      openBillingModal(proposal);
+      return;
+    }
     try {
       const proposalId = getItemId(proposal);
       const res = await fetch(`${API_URL}/proposals/${proposalId}/status`, {
@@ -1388,9 +1621,81 @@ export default function ProposalsPage() {
                     <div className="p-3 rounded-lg bg-muted/40"><p className="text-muted-foreground">Value</p><p className="font-semibold">{formatINR(value)}</p></div>
                     <div className="p-3 rounded-lg bg-muted/40"><p className="text-muted-foreground">Valid Until</p><p className="font-semibold">{formatDate(proposal.validUntil)}</p></div>
                   </div>
+
+                  {/* Settlement & Billing Summary Banner if Approved/Accepted */}
+                  {(proposal.status === "Approved" || proposal.status === "Accepted") && (
+                    <div className="mt-3">
+                      {proposal.billingConfigured ? (
+                        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <Badge className="bg-emerald-600 text-white font-bold text-[11px]">
+                                {proposal.billingCycle || "Project"} Retainer
+                              </Badge>
+                              <span className="text-xs font-bold text-foreground">
+                                Contract Value: {formatINR(proposal.agreedAmount || proposal.grandTotal)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Advance Paid: <strong className="text-emerald-600 dark:text-emerald-400">{formatINR(proposal.advancePaid || 0)}</strong>
+                              {proposal.advancePaymentMethod ? ` (${proposal.advancePaymentMethod})` : ""}
+                              {" • "}
+                              Pending Balance: <strong className={proposal.balancePending ? "text-amber-600 dark:text-amber-400 font-bold" : "text-emerald-600 font-bold"}>{formatINR(proposal.balancePending || 0)}</strong>
+                              {proposal.dueDate ? ` (Due: ${formatDate(proposal.dueDate)})` : ""}
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 font-bold text-xs shrink-0"
+                            onClick={() => openBillingModal(proposal)}
+                          >
+                            <CreditCard className="w-3.5 h-3.5 mr-1" />
+                            Update Billing / Advance
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-emerald-500/10 to-transparent border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                              Agreement Approved by Client — Billing Setup Required
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Configure billing model (Monthly / Project / Yearly), confirm agreed value amount, and record advance paid.
+                            </p>
+                          </div>
+                          <Button
+                            size="sm"
+                            className="bg-gradient-to-r from-amber-500 to-emerald-600 text-white font-bold shadow-md hover:from-amber-600 hover:to-emerald-700 shrink-0 text-xs"
+                            onClick={() => openBillingModal(proposal)}
+                          >
+                            <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+                            Setup Billing (Monthly/Project/Yearly)
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-2 xl:max-w-[520px] xl:justify-end">
+                  {(proposal.documentUrl || (proposal.attachments && proposal.attachments.length > 0)) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-primary/50 text-primary hover:bg-primary/10 font-semibold"
+                      onClick={() => {
+                        const doc = proposal.documentUrl || proposal.attachments?.[0]?.fileUrl;
+                        if (!doc) return;
+                        const fullUrl = doc.startsWith("http") ? doc : `${API_URL.replace("/api", "")}${doc}`;
+                        window.open(fullUrl, "_blank");
+                      }}
+                    >
+                      <FileText className="w-3 h-3 mr-1 text-primary" />
+                      Agreement Doc
+                    </Button>
+                  )}
                   <Button size="sm" variant="outline" onClick={() => { setPreviewProposal(proposal); setPreviewOpen(true); }}><Eye className="w-3 h-3 mr-1" />Preview</Button>
                   <Button size="sm" variant="outline" onClick={() => openEdit(proposal)}><Edit className="w-3 h-3 mr-1" />Edit</Button>
                   <Button size="sm" variant="outline" disabled={versioningId === id} onClick={() => openNewVersion(proposal)}><GitBranch className="w-3 h-3 mr-1" />{versioningId === id ? "Creating..." : "New Version"}</Button>
@@ -1424,6 +1729,16 @@ export default function ProposalsPage() {
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
+                {(proposal.status === "Approved" || proposal.status === "Accepted") && (
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                    onClick={() => openBillingModal(proposal)}
+                  >
+                    <CreditCard className="w-3.5 h-3.5 mr-1" />
+                    {proposal.billingConfigured ? "Manage Billing & Advance" : "⚡ Setup Billing"}
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" onClick={() => handleStatusChange(proposal, "Sent")}><MailCheck className="w-3 h-3 mr-1" />Mark Sent</Button>
                 <Button size="sm" variant="outline" onClick={() => handleStatusChange(proposal, "Viewed")}><Eye className="w-3 h-3 mr-1" />Viewed</Button>
                 <Button size="sm" variant="outline" onClick={() => handleStatusChange(proposal, "Approved")}><CheckCircle2 className="w-3 h-3 mr-1" />Approve</Button>
@@ -1438,136 +1753,246 @@ export default function ProposalsPage() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{editing ? "Update Proposal" : form.parentProposalId ? "Create New Proposal Version" : "Create Proposal"}</DialogTitle></DialogHeader>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 rounded-2xl shadow-2xl">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <FileUp className="w-5 h-5 text-primary" />
+              {editing ? "Edit Client Agreement" : "Create Client Proposal & Agreement"}
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Select client to auto-load details, upload the agreement document, and reflect it immediately to the client portal for approval.
+            </p>
+          </DialogHeader>
 
-          <div className="space-y-5">
-            <div className="p-4 rounded-xl bg-muted/30 border">
-              <div className="flex items-center gap-2 mb-3"><Sparkles className="w-4 h-4 text-primary" /><h3 className="font-semibold">Package Templates</h3></div>
-              <div className="flex flex-wrap gap-2">
-                {Object.values(proposalTemplates).map((template) => (
-                  <Button
-                    key={template.label}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => applyTemplate(template.label)}
-                    className="h-auto flex-col items-start gap-0 px-3 py-2 text-left"
-                  >
-                    <span className="font-semibold">{template.label}</span>
-                    <span className="text-[10px] text-muted-foreground">{template.category}</span>
-                  </Button>
-                ))}
+          <div className="space-y-5 pt-3">
+            {/* Step 1: Select Client */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                  <Building2 className="w-4 h-4 text-primary" />
+                  Select Client *
+                </label>
+                {customersLoading && <Badge variant="outline" className="text-[10px]">Loading clients...</Badge>}
               </div>
+
+              <Select
+                value={form.customerId || (form.customerName ? "custom" : "")}
+                onValueChange={(val) => handleClientSelect(val)}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Choose a client from registered customers" />
+                </SelectTrigger>
+                <SelectContent className="max-h-64">
+                  {customers.map((c) => {
+                    const cId = c._id || c.id;
+                    const cName = c.name || c.companyName || "Unnamed Client";
+                    const cBranch = c.branchId ? ` • ${c.branchId}` : "";
+                    const cPhone = Array.isArray(c.contactNumbers) ? c.contactNumbers[0] : c.phone || "";
+                    return (
+                      <SelectItem key={cId} value={cId}>
+                        <span className="font-semibold">{cName}</span>
+                        {c.businessType ? ` (${c.businessType})` : ""}
+                        {cBranch}
+                        {cPhone ? ` • ${cPhone}` : ""}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="space-y-4">
-              <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="font-semibold">Select Deal / Client</h3>
-                    <p className="text-xs text-muted-foreground">Choose a deal to auto-fill client details. Use manual entry when no deal is available.</p>
-                  </div>
-                  {dealsLoading && <Badge variant="outline">Loading deals...</Badge>}
+            {/* Step 2: Auto-Retrieved Client Details Card */}
+            {form.customerName && (
+              <div className="rounded-xl border bg-muted/30 p-4 space-y-3 animate-in fade-in-50 duration-200">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    Client Details Loaded
+                  </span>
+                  <Badge variant="outline" className="text-[11px] font-semibold">{form.branchId || "Branch Assigned"}</Badge>
                 </div>
 
-                <Select value={form.dealId || "manual"} onValueChange={handleDealSelect}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select deal / client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">Manual proposal / no deal</SelectItem>
-                    {deals.map((deal) => {
-                      const dealId = deal._id || deal.id || "";
-                      return (
-                        <SelectItem key={dealId} value={dealId}>
-                          {deal.title} — {deal.customerName} — {formatINR(deal.dealValue || 0)} — {deal.stage || "New"}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
+                  <div className="p-2.5 rounded-lg bg-background border">
+                    <p className="text-muted-foreground font-medium">Client / Business</p>
+                    <p className="font-bold text-foreground text-sm truncate">{form.customerName}</p>
+                    {form.companyName && form.companyName !== form.customerName && (
+                      <p className="text-[11px] text-muted-foreground truncate">{form.companyName}</p>
+                    )}
+                  </div>
 
-                {form.dealId && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-sm">
-                    <div className="rounded-lg bg-background border p-3"><p className="text-muted-foreground">Client</p><p className="font-semibold">{form.customerName || "-"}</p></div>
-                    <div className="rounded-lg bg-background border p-3"><p className="text-muted-foreground">Contact</p><p className="font-semibold">{form.contactNumber || "-"}</p></div>
-                    <div className="rounded-lg bg-background border p-3"><p className="text-muted-foreground">Business</p><p className="font-semibold">{form.businessType || "-"}</p></div>
-                    <div className="rounded-lg bg-background border p-3"><p className="text-muted-foreground">Branch</p><p className="font-semibold">{form.branchId || "-"}</p></div>
-                    <div className="rounded-lg bg-background border p-3"><p className="text-muted-foreground">Deal Value</p><p className="font-semibold">{formatINR(form.proposalValue)}</p></div>
+                  <div className="p-2.5 rounded-lg bg-background border">
+                    <p className="text-muted-foreground font-medium flex items-center gap-1">
+                      <Mail className="w-3 h-3 text-muted-foreground" /> Email Address
+                    </p>
+                    <p className="font-semibold text-foreground truncate">{form.clientEmail || "-"}</p>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-background border">
+                    <p className="text-muted-foreground font-medium flex items-center gap-1">
+                      <Phone className="w-3 h-3 text-muted-foreground" /> Contact Phone
+                    </p>
+                    <p className="font-semibold text-foreground truncate">{form.contactNumber || "-"}</p>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-background border">
+                    <p className="text-muted-foreground font-medium">Industry / Business Type</p>
+                    <p className="font-semibold text-foreground truncate">{form.businessType || "General Agency Services"}</p>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-background border">
+                    <p className="text-muted-foreground font-medium">Branch Location</p>
+                    <p className="font-semibold text-foreground truncate">{form.branchId || "-"}</p>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-background border">
+                    <p className="text-muted-foreground font-medium">Client Portal Sync</p>
+                    <p className="font-semibold text-emerald-600 dark:text-emerald-400">Active & Ready</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Upload Agreement Document */}
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                <UploadCloud className="w-4 h-4 text-primary" />
+                Upload Agreement Document *
+              </label>
+
+              <div className="rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 transition p-5 text-center relative cursor-pointer">
+                <input
+                  type="file"
+                  accept="application/pdf,.doc,.docx,image/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) setAgreementFile(f);
+                  }}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+
+                {agreementFile ? (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-background border shadow-sm text-left">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-foreground">{agreementFile.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(agreementFile.size / (1024 * 1024)).toFixed(2)} MB • {agreementFile.type || "Document"}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAgreementFile(null);
+                      }}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : form.documentUrl ? (
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-background border shadow-sm text-left">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-foreground">{form.documentName || "Current Agreement Document"}</p>
+                        <a
+                          href={form.documentUrl.startsWith("http") ? form.documentUrl : `${API_URL.replace("/api", "")}${form.documentUrl}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-primary underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          View Current Document
+                        </a>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground">Click or drop new file to replace</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2 py-2">
+                    <UploadCloud className="w-10 h-10 mx-auto text-primary" />
+                    <p className="font-bold text-sm text-foreground">Click to upload or drag & drop Agreement PDF / Document</p>
+                    <p className="text-xs text-muted-foreground">Supports PDF, DOC, DOCX or scanned agreement files up to 30MB</p>
                   </div>
                 )}
               </div>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <Input placeholder="Client Name *" value={form.customerName} onChange={(e) => setForm({ ...form, customerName: e.target.value })} />
-                <Input placeholder="Company Name" value={form.companyName} onChange={(e) => setForm({ ...form, companyName: e.target.value })} />
-                <Input placeholder="Contact Number *" value={form.contactNumber} onChange={(e) => setForm({ ...form, contactNumber: e.target.value })} />
-                <Input placeholder="Client Email" value={form.clientEmail} onChange={(e) => setForm({ ...form, clientEmail: e.target.value })} />
-                <Input placeholder="Business Type" value={form.businessType} onChange={(e) => setForm({ ...form, businessType: e.target.value })} />
-                <Input placeholder="Branch ID" value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })} />
-                <Input placeholder="GST Number" value={form.gstNumber} onChange={(e) => setForm({ ...form, gstNumber: e.target.value })} />
-                <Input placeholder="PAN Number" value={form.panNumber} onChange={(e) => setForm({ ...form, panNumber: e.target.value })} />
-                <Input placeholder="Valid Until" type="date" value={form.validUntil} onChange={(e) => setForm({ ...form, validUntil: e.target.value })} />
-                <Input placeholder="Deal ID" value={form.dealId} readOnly className="bg-muted/50" />
-                <Input placeholder="Lead ID" value={form.leadId} readOnly className="bg-muted/50" />
-                <Input placeholder="Customer ID" value={form.customerId} onChange={(e) => setForm({ ...form, customerId: e.target.value })} />
-                <Input placeholder="Assigned To ID" value={form.assignedTo} readOnly className="bg-muted/50" />
-                <Input placeholder="Proposal Title *" className="md:col-span-2" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-                <Input placeholder="Package Name" value={form.packageName} onChange={(e) => setForm({ ...form, packageName: e.target.value })} />
-                <Input placeholder="Parent Proposal ID" value={form.parentProposalId} onChange={(e) => setForm({ ...form, parentProposalId: e.target.value })} />
-                <Input placeholder="Version" type="number" value={form.version} onChange={(e) => setForm({ ...form, version: e.target.value })} />
-                <Select value={form.status} onValueChange={(value: ProposalStatus) => setForm({ ...form, status: value })}>
-                  <SelectTrigger><SelectValue placeholder="Proposal Status" /></SelectTrigger>
-                  <SelectContent>{statusOptions.map((status) => <SelectItem key={status} value={status}>{status}</SelectItem>)}</SelectContent>
-                </Select>
+            {/* Step 4: Agreement Title, Amount & Terms */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground">Agreement Title *</label>
+                <Input
+                  placeholder="e.g. Master Services Agreement"
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground">Agreement Value / Retainer (₹ Optional)</label>
+                <Input
+                  type="number"
+                  placeholder="e.g. 50000"
+                  value={form.proposalValue}
+                  onChange={(e) => setForm({ ...form, proposalValue: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-semibold text-muted-foreground">Notes / Scope Summary (Optional)</label>
+                <Textarea
+                  placeholder="Add key highlights or terms for the client..."
+                  rows={2}
+                  value={form.notes}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                />
               </div>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-3">
-              <Input type="number" placeholder="Discount" value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} />
-              <Input type="number" placeholder="GST %" value={form.gstPercentage} onChange={(e) => setForm({ ...form, gstPercentage: e.target.value })} />
-              <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 text-sm">
-                <p className="text-muted-foreground">Calculated Grand Total</p>
-                <p className="font-bold text-lg">{formatINR(calculateTotals(parseServices(form.servicesText, Number(form.proposalValue || 0)), Number(form.discount || 0), Number(form.gstPercentage || 18)).grandTotal)}</p>
-              </div>
+            {/* Step 5: Live Reflection Alert */}
+            <div className="p-3.5 rounded-xl border border-primary/20 bg-primary/5 text-xs space-y-1">
+              <p className="font-bold text-primary flex items-center gap-1.5">
+                <BadgeCheck className="w-4 h-4" />
+                Live Client Portal Sync
+              </p>
+              <p className="text-muted-foreground text-[11px] leading-relaxed">
+                When you click <strong>Save & Issue to Client</strong>, this agreement document will immediately appear in the client's portal for <strong>{form.customerName || "the selected client"}</strong> with an <strong>Approve Agreement</strong> button.
+              </p>
             </div>
-
-            <Textarea placeholder="Client Requirements / Project Requirements" value={form.requirements} onChange={(e) => setForm({ ...form, requirements: e.target.value })} />
-            <Textarea placeholder={`Services - one per line:\nService Name | Description | Quantity | Price`} value={form.servicesText} onChange={(e) => setForm({ ...form, servicesText: e.target.value })} />
-            <Textarea placeholder="Scope of Work" value={form.scopeOfWork} onChange={(e) => setForm({ ...form, scopeOfWork: e.target.value })} />
-            <Textarea placeholder="Deliverables" value={form.deliverables} onChange={(e) => setForm({ ...form, deliverables: e.target.value })} />
-            <Textarea placeholder="Project Timeline" value={form.projectTimeline} onChange={(e) => setForm({ ...form, projectTimeline: e.target.value })} />
-            <Textarea placeholder="Payment Terms" value={form.paymentTerms} onChange={(e) => setForm({ ...form, paymentTerms: e.target.value })} />
-            <Textarea placeholder="Terms & Conditions" value={form.termsAndConditions} onChange={(e) => setForm({ ...form, termsAndConditions: e.target.value })} />
-            <Textarea placeholder="Cancellation Policy" value={form.cancellationPolicy} onChange={(e) => setForm({ ...form, cancellationPolicy: e.target.value })} />
-            <Textarea placeholder="Support Period" value={form.supportPeriod} onChange={(e) => setForm({ ...form, supportPeriod: e.target.value })} />
-
-            <div className="p-4 rounded-xl bg-muted/30 border space-y-3">
-              <div className="flex items-center gap-2"><Paperclip className="w-4 h-4" /><h3 className="font-semibold">Attachments</h3><Badge variant="outline">Backend-ready URLs</Badge></div>
-              <Textarea placeholder={`Attachments - one per line:\nFile Name | File URL | File Type`} value={form.attachmentsText} onChange={(e) => setForm({ ...form, attachmentsText: e.target.value })} />
-              <div className="flex items-center gap-2 text-xs text-muted-foreground"><Upload className="w-3 h-3" />Real file upload needs backend multer/cloud storage endpoint. This UI already sends attachment records.</div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-muted/30 border space-y-3">
-              <div className="flex items-center gap-2"><Signature className="w-4 h-4" /><h3 className="font-semibold">Signature & Stamp</h3></div>
-              <div className="grid md:grid-cols-2 gap-3">
-                <Input placeholder="Digital Signature Name" value={form.digitalSignatureName} onChange={(e) => setForm({ ...form, digitalSignatureName: e.target.value })} />
-                <Input placeholder="Customer Signature URL" value={form.customerSignatureUrl} onChange={(e) => setForm({ ...form, customerSignatureUrl: e.target.value })} />
-                <Input placeholder="Authorized Signature URL" value={form.authorizedSignatureUrl} onChange={(e) => setForm({ ...form, authorizedSignatureUrl: e.target.value })} />
-                <Input placeholder="Company Stamp URL" value={form.companyStampUrl} onChange={(e) => setForm({ ...form, companyStampUrl: e.target.value })} />
-              </div>
-            </div>
-
-            <Textarea placeholder="Internal Notes" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-            <Input placeholder="Mail Subject" value={form.mailSubject} onChange={(e) => setForm({ ...form, mailSubject: e.target.value })} />
-            <Textarea placeholder="Mail Message" value={form.mailMessage} onChange={(e) => setForm({ ...form, mailMessage: e.target.value })} />
           </div>
 
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button variant="outline" onClick={() => { const preview = buildPayload() as Proposal; setPreviewProposal(preview); setPreviewOpen(true); }}><Eye className="w-4 h-4 mr-2" />Preview</Button>
-            <Button variant="gradient" onClick={handleSave} disabled={saving}>{saving ? "Saving..." : "Save Proposal Data"}</Button>
+          <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+            <Button
+              variant="gradient"
+              onClick={handleSave}
+              disabled={saving || !form.customerName}
+              className="gap-2 font-bold shadow-md"
+            >
+              {saving ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Saving & Uploading...
+                </>
+              ) : (
+                <>
+                  <UploadCloud className="w-4 h-4" />
+                  Save & Issue Agreement to Client
+                </>
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1597,7 +2022,351 @@ export default function ProposalsPage() {
                 <div><h4 className="font-semibold mb-1">Scope</h4><p className="text-muted-foreground whitespace-pre-line">{previewProposal.scopeOfWork || "-"}</p></div>
                 <div><h4 className="font-semibold mb-1">Payment Terms</h4><p className="text-muted-foreground whitespace-pre-line">{previewProposal.paymentTerms || "-"}</p></div>
               </div>
-              <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => handleDownloadProposal(previewProposal)}><Download className="w-4 h-4 mr-2" />Download PDF</Button></div>
+              {/* If Billing Configured, show in preview */}
+              {previewProposal.billingConfigured && (
+                <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                      <CreditCard className="w-4 h-4" />
+                      Agreed Contract Billing ({previewProposal.billingCycle || "Project"})
+                    </span>
+                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-600 dark:text-emerald-400">
+                      Billing Configured
+                    </Badge>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1">
+                    <div className="p-2 rounded bg-background border">
+                      <span className="text-muted-foreground block">Agreed Value</span>
+                      <strong className="text-foreground">{formatINR(previewProposal.agreedAmount || previewProposal.grandTotal)}</strong>
+                    </div>
+                    <div className="p-2 rounded bg-background border">
+                      <span className="text-muted-foreground block">Advance Paid</span>
+                      <strong className="text-emerald-600 dark:text-emerald-400">{formatINR(previewProposal.advancePaid || 0)}</strong>
+                    </div>
+                    <div className="p-2 rounded bg-background border">
+                      <span className="text-muted-foreground block">Pending Balance</span>
+                      <strong className={previewProposal.balancePending ? "text-amber-600 dark:text-amber-400" : "text-emerald-600"}>
+                        {formatINR(previewProposal.balancePending || 0)}
+                      </strong>
+                    </div>
+                    <div className="p-2 rounded bg-background border">
+                      <span className="text-muted-foreground block">Balance Due Date</span>
+                      <strong className="text-foreground">{formatDate(previewProposal.dueDate)}</strong>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2">
+                {(previewProposal.status === "Approved" || previewProposal.status === "Accepted") && (
+                  <Button
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                    onClick={() => {
+                      setPreviewOpen(false);
+                      openBillingModal(previewProposal);
+                    }}
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    {previewProposal.billingConfigured ? "Update Billing & Advance" : "Setup Billing"}
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => handleDownloadProposal(previewProposal)}>
+                  <Download className="w-4 h-4 mr-2" />Download PDF
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ================= BILLING & SETTLEMENT CONFIGURATION MODAL ================= */}
+      <Dialog open={billingModalOpen} onOpenChange={setBillingModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto p-6 rounded-2xl shadow-2xl">
+          <DialogHeader className="border-b pb-3">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-emerald-600" />
+              Configure Client Billing &amp; Settlement
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Client approved the proposal agreement. Select the billing cycle, confirm the contract value, and record any advance payment.
+            </p>
+          </DialogHeader>
+
+          {billingProposal && (
+            <div className="space-y-5 pt-3">
+              {/* Proposal & Client Summary */}
+              <div className="p-4 rounded-xl bg-muted/40 border flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div>
+                  <span className="text-muted-foreground block">Client / Company</span>
+                  <strong className="text-sm font-bold text-foreground">
+                    {billingProposal.customerName || billingProposal.clientName}
+                    {billingProposal.companyName ? ` (${billingProposal.companyName})` : ""}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block">Proposal Number</span>
+                  <span className="font-mono font-bold text-primary">
+                    {billingProposal.proposalNumber || "PR-Agreement"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block">Selected Agreement Value</span>
+                  <strong className="text-sm font-black text-foreground">
+                    {formatINR(billingProposal.grandTotal || billingProposal.proposalValue)}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Question 1: Billing Model (Monthly, Project, Yearly) */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block">
+                  1. Select Billing Model / Cycle *
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { id: "Monthly", label: "Monthly", desc: "Recurring Monthly Retainer", icon: CalendarDays },
+                    { id: "Project", label: "Project", desc: "Fixed Scope / Milestone", icon: Sparkles },
+                    { id: "Yearly", label: "Yearly", desc: "Annual Contract Retainer", icon: BadgeCheck },
+                  ].map((cycle) => {
+                    const isSelected = billingForm.billingCycle === cycle.id;
+                    const IconComp = cycle.icon;
+                    return (
+                      <button
+                        key={cycle.id}
+                        type="button"
+                        onClick={() => setBillingForm((prev) => ({ ...prev, billingCycle: cycle.id }))}
+                        className={`p-3.5 rounded-xl border text-left transition flex flex-col justify-between ${isSelected
+                            ? "bg-primary/10 border-primary text-primary shadow-sm ring-2 ring-primary/20"
+                            : "bg-card hover:bg-muted/40 border-border text-foreground"
+                          }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <IconComp className="w-5 h-5" />
+                          {isSelected && <Check className="w-4 h-4 font-bold" />}
+                        </div>
+                        <div>
+                          <strong className="block text-sm font-bold">{cycle.label}</strong>
+                          <span className="text-[11px] text-muted-foreground">{cycle.desc}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Question 2: Agreed Contract Value Amount */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    2. Agreed Contract Value Amount (₹) *
+                  </label>
+                  <span className="text-[11px] text-muted-foreground">
+                    Pre-filled from proposal agreement
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-muted-foreground">
+                    ₹
+                  </span>
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Enter agreed value amount"
+                    value={billingForm.agreedAmount}
+                    onChange={(e) =>
+                      setBillingForm((prev) => ({ ...prev, agreedAmount: e.target.value }))
+                    }
+                    className="pl-8 font-bold text-base"
+                  />
+                </div>
+              </div>
+
+              {/* Question 3: Advance Payment Received */}
+              <div className="space-y-3 p-4 rounded-xl border bg-muted/20">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Wallet className="w-4 h-4 text-emerald-600" />
+                    3. Advance Paid Amount (₹)
+                  </label>
+                  <span className="text-[11px] text-muted-foreground">
+                    Enter ₹0 if no advance paid yet
+                  </span>
+                </div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-muted-foreground">
+                    ₹
+                  </span>
+                  <Input
+                    type="number"
+                    min="0"
+                    placeholder="Advance paid amount (e.g. 20000)"
+                    value={billingForm.advancePaid}
+                    onChange={(e) =>
+                      setBillingForm((prev) => ({ ...prev, advancePaid: e.target.value }))
+                    }
+                    className="pl-8 font-bold text-base text-emerald-600 dark:text-emerald-400"
+                  />
+                </div>
+
+                {Number(billingForm.advancePaid || 0) > 0 && (
+                  <div className="grid sm:grid-cols-2 gap-3 pt-2 border-t">
+                    <div>
+                      <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                        Advance Payment Date
+                      </label>
+                      <Input
+                        type="date"
+                        value={billingForm.advancePaymentDate}
+                        onChange={(e) =>
+                          setBillingForm((prev) => ({
+                            ...prev,
+                            advancePaymentDate: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                        Payment Method
+                      </label>
+                      <Select
+                        value={billingForm.advancePaymentMethod}
+                        onValueChange={(val) =>
+                          setBillingForm((prev) => ({
+                            ...prev,
+                            advancePaymentMethod: val,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Method" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="UPI">UPI / GPay / PhonePe</SelectItem>
+                          <SelectItem value="Bank Transfer">Bank Transfer (NEFT/RTGS/IMPS)</SelectItem>
+                          <SelectItem value="Cash">Cash</SelectItem>
+                          <SelectItem value="Cheque">Cheque</SelectItem>
+                          <SelectItem value="Card">Credit / Debit Card</SelectItem>
+                          <SelectItem value="Net Banking">Net Banking</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                        Reference / Transaction ID
+                      </label>
+                      <Input
+                        placeholder="e.g. UPI Ref, UTR number, or Cheque number"
+                        value={billingForm.advancePaymentReference}
+                        onChange={(e) =>
+                          setBillingForm((prev) => ({
+                            ...prev,
+                            advancePaymentReference: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="text-[11px] font-semibold text-muted-foreground block mb-1">
+                        Payment Notes (Optional)
+                      </label>
+                      <Input
+                        placeholder="e.g. Advance paid upon agreement signoff"
+                        value={billingForm.advanceNotes}
+                        onChange={(e) =>
+                          setBillingForm((prev) => ({
+                            ...prev,
+                            advanceNotes: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Live Settlement Balance Calculation */}
+              {(() => {
+                const agreed = Number(billingForm.agreedAmount || 0);
+                const advance = Number(billingForm.advancePaid || 0);
+                const pending = Math.max(0, agreed - advance);
+
+                return (
+                  <div className="p-4 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white space-y-3">
+                    <div className="flex items-center justify-between text-xs text-slate-300">
+                      <span>Total Agreed Value:</span>
+                      <strong className="text-white text-sm">{formatINR(agreed)}</strong>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-300">
+                      <span>Advance Paid:</span>
+                      <strong className="text-emerald-400 text-sm">-{formatINR(advance)}</strong>
+                    </div>
+                    <div className="pt-2 border-t border-slate-700 flex items-center justify-between">
+                      <span className="text-sm font-bold text-white">Pending Balance:</span>
+                      <strong
+                        className={`text-lg font-black ${pending > 0 ? "text-amber-400" : "text-emerald-400"
+                          }`}
+                      >
+                        {formatINR(pending)}
+                      </strong>
+                    </div>
+
+                    {pending > 0 && (
+                      <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <span className="text-slate-400">Balance Payment Due Date:</span>
+                        <Input
+                          type="date"
+                          value={billingForm.dueDate}
+                          onChange={(e) =>
+                            setBillingForm((prev) => ({ ...prev, dueDate: e.target.value }))
+                          }
+                          className="w-auto bg-slate-800 border-slate-700 text-white text-xs h-8"
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Automation Explainer */}
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-[11px] text-muted-foreground space-y-1">
+                <p className="font-semibold text-foreground">Automatic CRM &amp; Portal Synchronization:</p>
+                <p>• Creates an official Invoice with original amount, advance deducted, and balance due.</p>
+                <p>• If advance paid &gt; 0, automatically records a verified Payment receipt.</p>
+                <p>• Reflects clearly on the Client Portal under Proposals &amp; Payments with complete breakdown.</p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setBillingModalOpen(false)}
+                  disabled={savingBilling}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveBilling}
+                  disabled={savingBilling || !billingForm.agreedAmount}
+                  className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold gap-2 shadow-md"
+                >
+                  {savingBilling ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      Setting Up Billing...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Confirm &amp; Setup Client Billing
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>

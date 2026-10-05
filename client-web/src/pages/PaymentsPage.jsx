@@ -38,6 +38,7 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [alerts, setAlerts] = useState([]);
+  const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState("payments"); // 'payments' | 'invoices' | 'alerts' | 'pending'
@@ -107,17 +108,35 @@ export default function PaymentsPage() {
       const alertsUrl = customerId
         ? `${API_BASE_URL}/communications/alerts?customerId=${customerId}`
         : `${API_BASE_URL}/communications/alerts`;
+      const propUrl = customerId
+        ? `${API_BASE_URL}/proposals?customerId=${customerId}`
+        : `${API_BASE_URL}/proposals`;
 
-      // Parallel fetch for payments, invoices, and alerts
-      const [paymentsRes, invoicesRes, alertsRes] = await Promise.allSettled([
+      // Parallel fetch for payments, invoices, alerts, and proposals
+      const [paymentsRes, invoicesRes, alertsRes, proposalsRes] = await Promise.allSettled([
         fetch(payUrl, { headers }),
         fetch(invUrl, { headers }),
         fetch(alertsUrl, { headers }),
+        fetch(propUrl, { headers }),
       ]);
 
       let loadedPayments = [];
       let loadedInvoices = [];
       let loadedAlerts = [];
+      let loadedProposals = [];
+
+      if (proposalsRes.status === "fulfilled" && proposalsRes.value.ok) {
+        const propData = await proposalsRes.value.json();
+        const arrayData = Array.isArray(propData)
+          ? propData
+          : Array.isArray(propData?.data)
+          ? propData.data
+          : Array.isArray(propData?.proposals)
+          ? propData.proposals
+          : [];
+        loadedProposals = arrayData;
+      }
+      setProposals(loadedProposals);
 
       if (paymentsRes.status === "fulfilled" && paymentsRes.value.ok) {
         const payData = await paymentsRes.value.json();
@@ -313,6 +332,10 @@ export default function PaymentsPage() {
     }
   };
 
+  const activeProposal = proposals.find(
+    (p) => (p.status === "Approved" || p.status === "Accepted") && (p.billingConfigured || p.billingCycle)
+  ) || proposals.find((p) => p.status === "Approved" || p.status === "Accepted") || proposals[0] || null;
+
   const totalInvoiced = invoices.reduce((acc, curr) => acc + (curr.total || 0), 0);
   const totalSettled = payments.reduce((acc, curr) => acc + Number(curr.amount || curr.paidAmount || 0), 0);
   const pendingAmount = Math.max(0, totalInvoiced - totalSettled);
@@ -472,6 +495,104 @@ export default function PaymentsPage() {
           </div>
         </div>
       </div>
+
+      {/* Active Agreement Billing & Settlement Overview */}
+      {activeProposal && (
+        <div className="glass-card rounded-2xl p-6 border-l-4 border-l-brand-500 space-y-4 shadow-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-xs font-bold text-brand-400 bg-brand-500/10 px-2.5 py-0.5 rounded-lg border border-brand-500/20">
+                  {activeProposal.proposalNumber || "AGREEMENT"}
+                </span>
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {activeProposal.billingCycle ? `${activeProposal.billingCycle} Contract Model` : "Agreed Client Proposal"}
+                </span>
+                {activeProposal.billingConfigured && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-medium">
+                    Verified by Agency Finance
+                  </span>
+                )}
+              </div>
+              <h3 className="text-lg font-black text-white">
+                {activeProposal.title || "Client Service Agreement"}
+              </h3>
+              <p className="text-xs text-slate-400">
+                Official billing schedule and payment settlement terms agreed with Digitalness Media.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {Number(activeProposal.balancePending !== undefined ? activeProposal.balancePending : Math.max(0, (activeProposal.agreedAmount || activeProposal.grandTotal || 0) - (activeProposal.advancePaid || 0))) > 0 && (
+                <button
+                  onClick={() => openSettleModal(null, activeProposal.balancePending || Math.max(0, (activeProposal.agreedAmount || activeProposal.grandTotal || 0) - (activeProposal.advancePaid || 0)))}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-500 to-emerald-500 hover:from-brand-600 text-slate-950 font-black text-xs shadow-glow transition"
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  <span>Settle Pending Balance</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 4 Detail Cards: Total Amount, Paid Amount, Pending Amount, Pending Due Date */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+              <span className="text-[11px] text-slate-400 block font-medium">Total Agreement Value</span>
+              <strong className="text-lg font-black text-white">
+                {formatCurrency(activeProposal.agreedAmount || activeProposal.grandTotal || activeProposal.totalAmount || 0)}
+              </strong>
+              <span className="text-[10px] text-slate-400 block">Agreed Contract Value</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+              <span className="text-[11px] text-slate-400 block font-medium">Paid Amount (incl. Advance)</span>
+              <strong className="text-lg font-black text-emerald-400">
+                {formatCurrency(activeProposal.advancePaid || 0)}
+              </strong>
+              <span className="text-[10px] text-emerald-400/80 block">
+                {activeProposal.advancePaymentMethod ? `Paid via ${activeProposal.advancePaymentMethod}` : "Settled & Verified"}
+              </span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+              <span className="text-[11px] text-slate-400 block font-medium">Pending Balance</span>
+              <strong className={`text-lg font-black ${
+                Number(activeProposal.balancePending !== undefined ? activeProposal.balancePending : Math.max(0, (activeProposal.agreedAmount || activeProposal.grandTotal || 0) - (activeProposal.advancePaid || 0))) > 0
+                  ? "text-amber-400"
+                  : "text-emerald-400"
+              }`}>
+                {formatCurrency(
+                  activeProposal.balancePending !== undefined
+                    ? activeProposal.balancePending
+                    : Math.max(0, (activeProposal.agreedAmount || activeProposal.grandTotal || 0) - (activeProposal.advancePaid || 0))
+                )}
+              </strong>
+              <span className="text-[10px] text-slate-400 block">Outstanding Due</span>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+              <span className="text-[11px] text-slate-400 block font-medium">Pending Due Date</span>
+              <strong className="text-lg font-bold text-slate-200">
+                {formatDate(activeProposal.dueDate || activeProposal.validUntil)}
+              </strong>
+              <span className="text-[10px] text-slate-400 block">Payment Schedule Due</span>
+            </div>
+          </div>
+
+          {activeProposal.advancePaymentReference && (
+            <div className="text-xs text-slate-400 flex items-center gap-2 pt-1 border-t border-slate-800/80">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>
+                Advance Payment Reference: <strong className="text-slate-200 font-mono">{activeProposal.advancePaymentReference}</strong>
+                {activeProposal.advancePaymentDate ? ` · Paid on ${formatDate(activeProposal.advancePaymentDate)}` : ""}
+                {activeProposal.advanceNotes ? ` · Note: ${activeProposal.advanceNotes}` : ""}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Financial KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

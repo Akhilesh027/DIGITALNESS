@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import {
   FileText,
   CheckCircle2,
@@ -17,6 +18,9 @@ import {
   Send,
   Download,
   TrendingUp,
+  Wallet,
+  CreditCard,
+  Receipt,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL, getAuthHeaders, extractCustomerId } from "../config/api";
@@ -339,31 +343,125 @@ export default function ProposalsPage() {
                     )}
                   </div>
 
+                  {/* Settlement & Agreement Financial Breakdown Card */}
+                  {(proposal.billingConfigured || proposal.billingCycle || proposal.status === "Accepted" || proposal.status === "Approved") && (
+                    <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900/90 via-slate-900 to-slate-800/80 border border-slate-700/80 space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <span className="font-bold uppercase tracking-wider text-brand-400 text-[11px] flex items-center gap-1.5">
+                          <CreditCard className="w-3.5 h-3.5" />
+                          {proposal.billingCycle ? `${proposal.billingCycle} Contract Billing Model` : "Agreed Billing Settlement"}
+                        </span>
+                        {proposal.billingConfigured && (
+                          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Billing Configured
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-slate-300">
+                        <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block font-medium">Total Amount</span>
+                          <strong className="text-white text-xs font-black">
+                            {formatCurrency(proposal.agreedAmount || proposal.grandTotal || proposal.totalAmount || 0)}
+                          </strong>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block font-medium">Paid Amount</span>
+                          <strong className="text-emerald-400 text-xs font-black">
+                            {formatCurrency(proposal.advancePaid || 0)}
+                          </strong>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block font-medium">Pending Amount</span>
+                          <strong className={`text-xs font-black ${
+                            Number(proposal.balancePending !== undefined ? proposal.balancePending : Math.max(0, (proposal.agreedAmount || proposal.grandTotal || 0) - (proposal.advancePaid || 0))) > 0
+                              ? "text-amber-400"
+                              : "text-emerald-400"
+                          }`}>
+                            {formatCurrency(
+                              proposal.balancePending !== undefined
+                                ? proposal.balancePending
+                                : Math.max(0, (proposal.agreedAmount || proposal.grandTotal || 0) - (proposal.advancePaid || 0))
+                            )}
+                          </strong>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                          <span className="text-[10px] text-slate-400 block font-medium">Pending Due Date</span>
+                          <strong className="text-slate-200 text-xs font-bold">
+                            {formatDate(proposal.dueDate || proposal.validUntil)}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {Number(proposal.balancePending !== undefined ? proposal.balancePending : Math.max(0, (proposal.agreedAmount || proposal.grandTotal || 0) - (proposal.advancePaid || 0))) > 0 && (
+                        <div className="flex items-center justify-between pt-1.5 border-t border-slate-800/80 text-[11px]">
+                          <span className="text-slate-400 flex items-center gap-1">
+                            {proposal.advancePaymentMethod ? (
+                              <>
+                                <Check className="w-3 h-3 text-emerald-400" />
+                                Advance paid via {proposal.advancePaymentMethod}
+                                {proposal.advancePaymentReference ? ` (${proposal.advancePaymentReference})` : ""}
+                              </>
+                            ) : (
+                              "Balance payment scheduled as per agreement"
+                            )}
+                          </span>
+                          <Link
+                            to="/payments"
+                            className="inline-flex items-center gap-1 text-brand-400 hover:text-brand-300 font-bold transition"
+                          >
+                            <span>Settle Pending Balance</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </Link>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Actions */}
                   <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
-                    <button
-                      onClick={() => setViewProposal(proposal)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      View Details
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setViewProposal(proposal)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        View Agreement
+                      </button>
+                      {(proposal.documentUrl || proposal.attachments?.[0]?.fileUrl) && (
+                        <button
+                          onClick={() => {
+                            const doc = proposal.documentUrl || proposal.attachments?.[0]?.fileUrl;
+                            const fullUrl = doc.startsWith("http") ? doc : `${API_BASE_URL.replace("/api", "")}${doc}`;
+                            window.open(fullUrl, "_blank");
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 text-xs font-bold transition border border-brand-500/30"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Document
+                        </button>
+                      )}
+                    </div>
 
-                    {(proposal.status === "Sent" || proposal.status === "Draft") && (
+                    {(proposal.status !== "Accepted" && proposal.status !== "Approved") && (
                       <button
                         onClick={() => handleAcceptProposal(proposal)}
                         disabled={accepting}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-brand-500 to-emerald-500 hover:from-brand-600 text-slate-950 font-black text-xs transition shadow-sm disabled:opacity-50"
+                        className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gradient-to-r from-brand-500 to-emerald-500 hover:from-brand-600 text-slate-950 font-black text-xs transition shadow-sm disabled:opacity-50"
                       >
                         <Check className="w-3.5 h-3.5" />
-                        Accept Proposal
+                        Approve Agreement
                       </button>
                     )}
 
-                    {proposal.status === "Accepted" && (
-                      <span className="inline-flex items-center gap-1 text-emerald-400 text-xs font-bold">
+                    {(proposal.status === "Accepted" || proposal.status === "Approved") && (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        Accepted
+                        Approved
                       </span>
                     )}
                   </div>
@@ -458,6 +556,81 @@ export default function ProposalsPage() {
               )}
             </div>
 
+            {/* Official Agreement Settlement & Billing Breakdown */}
+            {(viewProposal.billingConfigured || viewProposal.billingCycle || viewProposal.status === "Accepted" || viewProposal.status === "Approved") && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-800/80 border border-slate-700 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="font-extrabold uppercase tracking-wider text-brand-400 text-xs flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4" />
+                    Agreement Financial Settlement ({viewProposal.billingCycle || "Project"} Model)
+                  </span>
+                  {viewProposal.billingConfigured && (
+                    <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      Billing Configured
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-slate-300">
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block font-medium">Total Agreement Value</span>
+                    <strong className="text-white text-sm font-black">
+                      {formatCurrency(viewProposal.agreedAmount || viewProposal.grandTotal || viewProposal.totalAmount || 0)}
+                    </strong>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block font-medium">Total Paid Amount</span>
+                    <strong className="text-emerald-400 text-sm font-black">
+                      {formatCurrency(viewProposal.advancePaid || 0)}
+                    </strong>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block font-medium">Pending Balance</span>
+                    <strong className={`text-sm font-black ${
+                      Number(viewProposal.balancePending !== undefined ? viewProposal.balancePending : Math.max(0, (viewProposal.agreedAmount || viewProposal.grandTotal || 0) - (viewProposal.advancePaid || 0))) > 0
+                        ? "text-amber-400"
+                        : "text-emerald-400"
+                    }`}>
+                      {formatCurrency(
+                        viewProposal.balancePending !== undefined
+                          ? viewProposal.balancePending
+                          : Math.max(0, (viewProposal.agreedAmount || viewProposal.grandTotal || 0) - (viewProposal.advancePaid || 0))
+                      )}
+                    </strong>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
+                    <span className="text-[10px] text-slate-400 block font-medium">Pending Due Date</span>
+                    <strong className="text-slate-200 text-xs font-bold">
+                      {formatDate(viewProposal.dueDate || viewProposal.validUntil)}
+                    </strong>
+                  </div>
+                </div>
+
+                {viewProposal.advancePaymentMethod && (
+                  <div className="text-[11px] text-slate-400 flex items-center justify-between pt-1 border-t border-slate-800">
+                    <span>
+                      Advance Payment: <strong>{formatCurrency(viewProposal.advancePaid || 0)}</strong> via {viewProposal.advancePaymentMethod}
+                      {viewProposal.advancePaymentReference ? ` (Ref: ${viewProposal.advancePaymentReference})` : ""}
+                      {viewProposal.advancePaymentDate ? ` on ${formatDate(viewProposal.advancePaymentDate)}` : ""}
+                    </span>
+                    {Number(viewProposal.balancePending !== undefined ? viewProposal.balancePending : Math.max(0, (viewProposal.agreedAmount || viewProposal.grandTotal || 0) - (viewProposal.advancePaid || 0))) > 0 && (
+                      <Link
+                        to="/payments"
+                        className="inline-flex items-center gap-1 text-brand-400 hover:text-brand-300 font-bold"
+                      >
+                        <span>Go to Payments</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Services Table */}
             {Array.isArray(viewProposal.services) && viewProposal.services.length > 0 && (
               <div>
@@ -522,6 +695,37 @@ export default function ProposalsPage() {
               </div>
             )}
 
+            {/* Official Agreement Document Section */}
+            {(viewProposal.documentUrl || viewProposal.attachments?.[0]?.fileUrl) && (
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-brand-500/10 to-emerald-500/10 border border-brand-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-brand-500/20 text-brand-400">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h5 className="text-sm font-bold text-white">
+                      {viewProposal.documentName || "Official Agreement Document"}
+                    </h5>
+                    <p className="text-[11px] text-slate-400">
+                      Uploaded by agency for your review and digital agreement sign-off
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const doc = viewProposal.documentUrl || viewProposal.attachments?.[0]?.fileUrl;
+                    const fullUrl = doc.startsWith("http") ? doc : `${API_BASE_URL.replace("/api", "")}${doc}`;
+                    window.open(fullUrl, "_blank");
+                  }}
+                  className="px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 text-slate-950 font-black text-xs inline-flex items-center gap-1.5 transition shrink-0"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  View / Download Document
+                </button>
+              </div>
+            )}
+
             {/* Actions */}
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
               <button
@@ -530,14 +734,21 @@ export default function ProposalsPage() {
               >
                 Close
               </button>
-              {(viewProposal.status === "Sent" || viewProposal.status === "Draft") && (
+              {(viewProposal.status !== "Accepted" && viewProposal.status !== "Approved") && (
                 <button
                   onClick={() => handleAcceptProposal(viewProposal)}
                   disabled={accepting}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-brand-500 to-emerald-500 hover:from-brand-600 text-slate-950 font-black text-xs shadow-glow transition disabled:opacity-50"
+                  className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-brand-500 to-emerald-500 hover:from-brand-600 text-slate-950 font-black text-xs shadow-glow transition disabled:opacity-50 inline-flex items-center gap-1.5"
                 >
-                  {accepting ? "Processing..." : "Accept Proposal"}
+                  <Check className="w-4 h-4" />
+                  {accepting ? "Processing Approval..." : "Approve Agreement"}
                 </button>
+              )}
+              {(viewProposal.status === "Accepted" || viewProposal.status === "Approved") && (
+                <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Agreement Approved
+                </span>
               )}
             </div>
           </div>
