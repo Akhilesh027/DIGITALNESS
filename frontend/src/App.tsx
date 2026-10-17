@@ -50,7 +50,6 @@ import CustomerOnboardingPage from "./pages/CustomerOnboardingPage";
 import AIWorkspacePage from "./pages/AIWorkspacePage";
 import AgentActivityPage from "./pages/AgentActivityPage";
 import AdCampaignsPage from "./pages/AdCampaignsPage";
-import TablesManagementPage from "./pages/TablesManagementPage";
 import { UpcomingFeatureGuard } from "@/components/layout/UpcomingFeatureGuard";
 import { isTokenValid, clearAuth } from "@/api/auth";
 
@@ -299,7 +298,6 @@ const App = () => (
                 </UpcomingFeatureGuard>
               }
             />
-            <Route path="/tables" element={<TablesManagementPage />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
