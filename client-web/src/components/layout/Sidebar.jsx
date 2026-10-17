@@ -12,6 +12,7 @@ import {
   ExternalLink,
   ShieldCheck,
   X,
+  Sparkles,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 
@@ -23,6 +24,7 @@ const navItems = [
   { to: "/payments", label: "Invoices & Payments", icon: CreditCard },
   { to: "/proposals", label: "Proposals & Agreements", icon: FileText },
   { to: "/profile", label: "Client Profile", icon: UserCheck },
+  { to: "/upcoming", label: "Upcoming AI Suite", icon: Sparkles, badge: "DEMO" },
 ];
 
 export const Sidebar = ({ isOpen, onClose }) => {
@@ -102,6 +104,11 @@ export const Sidebar = ({ isOpen, onClose }) => {
                       }`}
                     />
                     <span className="flex-1">{item.label}</span>
+                    {item.badge && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-sm animate-pulse">
+                        {item.badge}
+                      </span>
+                    )}
                     {isActive && (
                       <span className="w-1.5 h-1.5 rounded-full bg-brand-400 shadow-glow" />
                     )}

@@ -810,8 +810,8 @@ export default function EmployeesPage() {
                     });
                   }}
                   className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 border ${isSelected
-                      ? "bg-primary text-primary-foreground border-primary shadow-sm font-semibold"
-                      : "bg-muted/40 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm font-semibold"
+                    : "bg-muted/40 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
                     }`}
                 >
                   {isSelected && <Check className="w-3.5 h-3.5" />}

@@ -146,6 +146,34 @@ const customerSchema = new mongoose.Schema(
     totalPaid: { type: Number, default: 0 },
     totalPending: { type: Number, default: 0 },
 
+    rechargePlan: {
+      planName: { type: String, default: "Standard Retainer" },
+      validFrom: { type: Date, default: Date.now },
+      validUntil: { type: Date, default: null },
+      billingFrequency: { type: String, enum: ["Monthly", "Quarterly", "Annual", "Custom"], default: "Monthly" },
+      monthlyAmount: { type: Number, default: 0 },
+      servicesIncluded: { type: [String], default: ["Social Media Management", "Performance Ads", "Graphic Design"] },
+      gracePeriodDays: { type: Number, default: 3 },
+      autoHoldOnExpiry: { type: Boolean, default: false },
+    },
+
+    accessControl: {
+      isPortalLocked: { type: Boolean, default: false, index: true },
+      lockReason: { type: String, default: "" },
+      lockedAt: { type: Date, default: null },
+      lockedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      servicesSuspended: { type: Boolean, default: false },
+      lockMessage: {
+        type: String,
+        default: "Your marketing services and portal access are currently on hold due to pending payment. Please settle your outstanding dues to restore full access immediately.",
+      },
+      holdType: {
+        type: String,
+        enum: ["PAYMENT_OVERDUE", "RENEWAL_REQUIRED", "MANUAL_HOLD", "NONE"],
+        default: "NONE",
+      },
+    },
+
     notes: { type: String, default: "" },
 
     status: {

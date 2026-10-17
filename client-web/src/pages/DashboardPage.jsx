@@ -24,6 +24,7 @@ import {
   Eye,
   Check,
   AlertCircle,
+  Play,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL, getAuthHeaders, extractCustomerId, getMediaUrl } from "../config/api";
@@ -671,6 +672,34 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Upcoming AI Suite Callout Banner */}
+      <div className="glass-card rounded-2xl p-6 border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-slate-900/60 to-brand-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden">
+        <div className="space-y-1 relative z-10">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              UPCOMING PREVIEW
+            </span>
+            <span className="text-xs text-slate-400 font-medium">Digitalness AI v2.4</span>
+          </div>
+          <h4 className="text-base font-extrabold text-white flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+            Autonomous AI Suite & Automated Campaign Engines
+          </h4>
+          <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+            Test newly added modules including our AI Content Calendar, Prompt-to-Banner Creative Studio, and Autonomous Performance Ad Engines.
+          </p>
+        </div>
+
+        <Link
+          to="/upcoming"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs shadow-glow transition shrink-0 z-10"
+        >
+          <Play className="w-3.5 h-3.5 fill-current" />
+          <span>Launch Live Demo</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </Link>
       </div>
 
       {/* Priority Support Callout */}

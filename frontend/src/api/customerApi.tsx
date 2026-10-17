@@ -42,3 +42,55 @@ export const getContextPreview = async (id: string, agentType = 'Parent', locati
   const data = await res.json();
   return data.data;
 };
+
+export const lockCustomerPortal = async (id: string, payload: any) => {
+  const res = await fetch(`${API_URL}/customers/${id}/lock-portal`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to lock portal');
+  return data;
+};
+
+export const unlockCustomerPortal = async (id: string) => {
+  const res = await fetch(`${API_URL}/customers/${id}/unlock-portal`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to unlock portal');
+  return data;
+};
+
+export const rechargeCustomerPlan = async (id: string, payload: any) => {
+  const res = await fetch(`${API_URL}/customers/${id}/recharge`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to recharge service plan');
+  return data;
+};
+
+export const getCustomerRechargeStatus = async (id: string) => {
+  const res = await fetch(`${API_URL}/customers/${id}/recharge-status`, {
+    headers: authHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to fetch recharge status');
+  return data.data;
+};
+
+export const sendRechargeDueAlert = async (id: string, payload: any) => {
+  const res = await fetch(`${API_URL}/customers/${id}/send-recharge-alert`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to send recharge alert');
+  return data;
+};

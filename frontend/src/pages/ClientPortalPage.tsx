@@ -578,8 +578,10 @@ export default function ClientPortalPage() {
         throw new Error(data.message || "Failed to verify payment");
       }
       toast({
-        title: "Payment Verified",
-        description: "Payment verified successfully and reconciled with invoice.",
+        title: data.portalUnlocked ? "Payment Verified & Hold Removed" : "Payment Verified",
+        description: data.portalUnlocked
+          ? "Payment approved! Client portal hold has been removed and active services restored."
+          : (data.message || "Payment verified successfully and reconciled with invoice."),
       });
       if (selectedCustomerId) {
         fetchCustomerFinancials(selectedCustomerId);

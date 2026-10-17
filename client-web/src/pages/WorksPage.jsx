@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import {
   Briefcase,
   Search,
@@ -19,6 +20,7 @@ import {
   ThumbsUp,
   RotateCcw,
   Paperclip,
+  Play,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL, getAuthHeaders, extractCustomerId, getMediaUrl } from "../config/api";
@@ -31,6 +33,7 @@ const FILTERS = [
   "Pending",
   "Revision",
   "Completed",
+  "Upcoming",
 ];
 
 export default function WorksPage() {
@@ -242,6 +245,8 @@ export default function WorksPage() {
         return "bg-blue-500/10 text-blue-400 border-blue-500/20";
       case "Revision":
         return "bg-purple-500/10 text-purple-400 border-purple-500/20";
+      case "Upcoming":
+        return "bg-amber-400/20 text-amber-300 border-amber-400/30";
       default:
         return "bg-slate-700/30 text-slate-300 border-slate-700/50";
     }
@@ -400,7 +405,18 @@ export default function WorksPage() {
                       {work.status || "Pending"}
                     </span>
 
-                    {work.status !== "Completed" && (
+                    {(work.status === "Upcoming" || work.isUpcoming || work.hasDemo) && (
+                      <Link
+                        to="/upcoming"
+                        className="px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-black text-xs shadow-glow transition flex items-center gap-1.5"
+                        title="Interactive live demo"
+                      >
+                        <Play className="w-3 h-3 fill-current" />
+                        <span>Try Demo</span>
+                      </Link>
+                    )}
+
+                    {work.status !== "Completed" && work.status !== "Upcoming" && (
                       <button
                         onClick={() => handleApproveWork(work._id)}
                         className="px-3 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition flex items-center gap-1"

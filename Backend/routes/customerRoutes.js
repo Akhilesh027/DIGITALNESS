@@ -13,6 +13,11 @@ const {
   resetCustomerPassword,
   getCustomerReadiness,
   getContextPreview,
+  lockCustomerPortal,
+  unlockCustomerPortal,
+  rechargeCustomerPlan,
+  getCustomerRechargeStatus,
+  sendRechargeDueAlert,
 } = require("../controllers/customerController.js");
 
 const { protect } = require("../middleware/authMiddleware");
@@ -29,6 +34,11 @@ router.get("/branch/:branchId", getCustomersByBranch);
 
 router.get("/:id/readiness", getCustomerReadiness);
 router.get("/:id/context-preview", getContextPreview);
+router.get("/:id/recharge-status", getCustomerRechargeStatus);
+router.post("/:id/lock-portal", lockCustomerPortal);
+router.post("/:id/unlock-portal", unlockCustomerPortal);
+router.post("/:id/recharge", rechargeCustomerPlan);
+router.post("/:id/send-recharge-alert", sendRechargeDueAlert);
 router.post("/:id/communications", addCustomerCommunication);
 router.post("/:id/documents", addCustomerDocument);
 router.delete("/:id/documents/:documentIndex", deleteCustomerDocument);

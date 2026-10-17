@@ -30,11 +30,14 @@ import {
   Share2,
   CheckCircle2,
   Globe,
+  CreditCard,
+  ShieldAlert,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { RechargeAccessControlModal } from "@/components/customers/RechargeAccessControlModal";
 import {
   Dialog,
   DialogContent,
@@ -169,6 +172,22 @@ interface Customer {
   reportContent?: ReportContent;
   totalPaid?: number;
   totalPending?: number;
+  rechargePlan?: {
+    planName?: string;
+    validFrom?: string;
+    validUntil?: string;
+    billingFrequency?: string;
+    monthlyAmount?: number;
+    servicesIncluded?: string[];
+  };
+  accessControl?: {
+    isPortalLocked?: boolean;
+    lockReason?: string;
+    lockMessage?: string;
+    holdType?: string;
+    lockedAt?: string;
+    servicesSuspended?: boolean;
+  };
   status?: "Active" | "Inactive" | string;
   createdAt?: string;
   updatedAt?: string;
@@ -299,6 +318,7 @@ export default function CustomersPage() {
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [clientLoginLoading, setClientLoginLoading] = useState(false);
   const [loginCustomer, setLoginCustomer] = useState<Customer | null>(null);
+  const [rechargeCustomer, setRechargeCustomer] = useState<Customer | null>(null);
   const [clientEmail, setClientEmail] = useState("");
   const [clientPassword, setClientPassword] = useState("");
   const [needsPassword, setNeedsPassword] = useState(false);
@@ -780,79 +800,114 @@ export default function CustomersPage() {
 
   return (
     <div className="space-y-6 pb-8">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl md:text-3xl font-heading font-bold text-foreground">Customers</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Manage client dashboard, documents, login credentials, communications, activities and work history.</p>
+          <h1 className="text-2xl sm:text-3xl font-heading font-bold text-foreground">Customers</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Manage client dashboard, documents, login credentials, communications, activities and work history.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={refreshAll} disabled={pageLoading}><RefreshCcw className={`w-4 h-4 mr-2 ${pageLoading ? "animate-spin" : ""}`} />Refresh</Button>
-          <Button variant="outline" onClick={downloadAllCustomersReport} disabled={pageLoading || customers.length === 0}><Download className="w-4 h-4 mr-2" />All Customers Report</Button>
-          <Button variant="gradient" onClick={openAddCustomer} disabled={pageLoading}>{pageLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}Add Customer</Button>
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" size="sm" onClick={refreshAll} disabled={pageLoading} className="flex-1 sm:flex-initial h-9">
+            <RefreshCcw className={`w-3.5 h-3.5 mr-1.5 ${pageLoading ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={downloadAllCustomersReport} disabled={pageLoading || customers.length === 0} className="flex-1 sm:flex-initial h-9">
+            <Download className="w-3.5 h-3.5 mr-1.5" />
+            <span>Report</span>
+          </Button>
+          <Button variant="gradient" size="sm" onClick={openAddCustomer} disabled={pageLoading} className="w-full sm:w-auto h-9 font-medium">
+            {pageLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Plus className="w-3.5 h-3.5 mr-1.5" />}
+            <span>Add Customer</span>
+          </Button>
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        <StatCard title="Total Customers" value={customers.length} icon={<User className="w-5 h-5" />} />
-        <StatCard title="Active Customers" value={activeCustomers} icon={<ShieldCheck className="w-5 h-5" />} />
-        <StatCard title="Client Logins" value={withLogin} icon={<KeyRound className="w-5 h-5" />} />
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
+        <StatCard title="Total Customers" value={customers.length} icon={<User className="w-4 h-4 sm:w-5 sm:h-5" />} />
+        <StatCard title="Active Customers" value={activeCustomers} icon={<ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />} />
+        <StatCard title="Client Logins" value={withLogin} icon={<KeyRound className="w-4 h-4 sm:w-5 sm:h-5" />} />
         <StatCard title="Total Paid" value={formatCurrency(totalPaid)} highlight />
-        <StatCard title="Pending" value={formatCurrency(totalPending)} icon={<WalletCards className="w-5 h-5" />} />
+        <StatCard title="Pending" value={formatCurrency(totalPending)} icon={<WalletCards className="w-4 h-4 sm:w-5 sm:h-5" />} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3">
-        <div className="relative w-full max-w-xl"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input placeholder="Search customer, PAN, GST, branch, tasks, employees..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} disabled={pageLoading} className="pl-10" /></div>
-        <div className="rounded-lg border border-border bg-card px-4 py-2 text-sm text-muted-foreground">Showing <span className="font-semibold text-foreground">{filteredCustomers.length}</span> customers</div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative w-full sm:max-w-md md:max-w-xl">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="Search customer, PAN, GST, branch, tasks, employees..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} disabled={pageLoading} className="pl-10 text-sm h-9 sm:h-10" />
+        </div>
+        <div className="rounded-lg border border-border bg-card px-3.5 py-1.5 text-xs sm:text-sm text-muted-foreground self-start sm:self-auto shrink-0">
+          Showing <span className="font-semibold text-foreground">{filteredCustomers.length}</span> customers
+        </div>
       </div>
 
       {pageLoading ? <CustomersLoadingSkeleton /> : filteredCustomers.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-muted-foreground">No customers found</div>
       ) : (
-        <motion.div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4">
+        <motion.div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4">
           {filteredCustomers.map((customer, index) => {
             const customerWorks = getCustomerWorks(customer._id);
             const hasClientLogin = Boolean(customer.userId);
             const primaryPhone = customer.contactNumbers?.[0] || "—";
             const docsCount = (customer.supportingDocuments || customer.documents || []).length;
             return (
-              <motion.div key={customer._id} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }} className="bg-card rounded-2xl border border-border shadow-card p-5 hover:shadow-card-hover transition-all group">
-                <div className="flex items-start justify-between gap-3 mb-4">
-                  {customer.brandProfile?.logoUrl ? (
-                    <img src={customer.brandProfile.logoUrl} alt={customer.name} className="w-12 h-12 shrink-0 rounded-lg object-contain border border-border bg-white p-1" />
-                  ) : (
-                    <div className="w-12 h-12 shrink-0 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-lg">{customer.name?.charAt(0)?.toUpperCase() || "C"}</div>
-                  )}
-                  <div className="min-w-0"><h3 className="font-semibold text-foreground truncate">{customer.name}</h3><p className="text-sm text-muted-foreground truncate">{customer.companyName || customer.businessType || "Business"}</p></div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => openEditCustomer(customer)}><Edit3 className="w-4 h-4" /></Button>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedCustomer(customer)}><Eye className="w-4 h-4" /></Button>
+              <motion.div key={customer._id} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }} className="bg-card rounded-2xl border border-border shadow-card p-4 sm:p-5 hover:shadow-card-hover transition-all group flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start justify-between gap-3 mb-3.5">
+                    {customer.brandProfile?.logoUrl ? (
+                      <img src={customer.brandProfile.logoUrl} alt={customer.name} className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-lg object-contain border border-border bg-white p-1" />
+                    ) : (
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-base sm:text-lg">{customer.name?.charAt(0)?.toUpperCase() || "C"}</div>
+                    )}
+                    <div className="min-w-0 flex-1"><h3 className="font-semibold text-foreground truncate text-sm sm:text-base">{customer.name}</h3><p className="text-xs sm:text-sm text-muted-foreground truncate">{customer.companyName || customer.businessType || "Business"}</p></div>
+                    <div className="flex gap-1 shrink-0">
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEditCustomer(customer)}><Edit3 className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setSelectedCustomer(customer)}><Eye className="w-4 h-4" /></Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 mb-3.5 cursor-pointer" onClick={() => setSelectedCustomer(customer)}>
+                    <InfoRow icon={<Phone className="w-3.5 h-3.5" />} text={primaryPhone} />
+                    <InfoRow icon={<Mail className="w-3.5 h-3.5" />} text={customer.email || "No email"} />
+                    <InfoRow icon={<MapPin className="w-3.5 h-3.5" />} text={[customer.city, customer.state].filter(Boolean).join(", ") || "—"} />
+                    <InfoRow icon={<Building2 className="w-3.5 h-3.5" />} text={branchName(customer.branchId || customer.branch)} />
+                    <InfoRow icon={<User className="w-3.5 h-3.5" />} text={getAssignedName(customer.assignedTo)} />
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                      <Badge variant={customer.status === "Inactive" ? "destructive" : "default"} className="text-[11px] px-2 py-0.5">{customer.status || "Active"}</Badge>
+                      {customer.accessControl?.isPortalLocked && (
+                        <Badge variant="destructive" className="bg-rose-600 text-white font-bold animate-pulse text-[11px] px-2 py-0.5">
+                          <Lock className="w-3 h-3 mr-1" /> Portal Held
+                        </Badge>
+                      )}
+                      {customer.rechargePlan?.validUntil && (
+                        <Badge variant="outline" className="text-primary border-primary/40 font-mono text-[10px] px-2 py-0.5">
+                          📅 {new Date(customer.rechargePlan.validUntil) < new Date() ? "Expired" : "Active Plan"}
+                        </Badge>
+                      )}
+                      <Badge variant="secondary" className="text-[11px] px-2 py-0.5">{customerWorks.length} Works</Badge>
+                      <Badge variant="outline" className="text-[11px] px-2 py-0.5">{docsCount} Docs</Badge>
+                      <Badge variant={hasClientLogin ? "default" : "outline"} className="text-[11px] px-2 py-0.5">{hasClientLogin ? "Login Active" : "No Login"}</Badge>
+                    </div>
                   </div>
                 </div>
 
-                <div className="space-y-2 mb-4 cursor-pointer" onClick={() => setSelectedCustomer(customer)}>
-                  <InfoRow icon={<Phone className="w-4 h-4" />} text={primaryPhone} />
-                  <InfoRow icon={<Mail className="w-4 h-4" />} text={customer.email || "No email"} />
-                  <InfoRow icon={<MapPin className="w-4 h-4" />} text={[customer.city, customer.state].filter(Boolean).join(", ") || "—"} />
-                  <InfoRow icon={<Building2 className="w-4 h-4" />} text={branchName(customer.branchId || customer.branch)} />
-                  <InfoRow icon={<User className="w-4 h-4" />} text={getAssignedName(customer.assignedTo)} />
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
-                    <Badge variant={customer.status === "Inactive" ? "destructive" : "default"}>{customer.status || "Active"}</Badge>
-                    <Badge variant="secondary">{customerWorks.length} Works</Badge>
-                    <Badge variant="outline">{docsCount} Docs</Badge>
-                    <Badge variant={hasClientLogin ? "default" : "outline"}>{hasClientLogin ? "Login Active" : "No Login"}</Badge>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-border space-y-2">
-                  {customerWorks.slice(0, 2).map((work) => <div key={work._id} className="rounded-lg bg-muted/40 p-2"><p className="text-sm font-medium line-clamp-1">{work.title}</p><p className="text-xs text-muted-foreground">{work.workType || work.type || "General"} • {work.status || "Pending"}</p></div>)}
-                  {customerWorks.length > 2 && <p className="text-xs text-muted-foreground">+{customerWorks.length - 2} more works</p>}
-                  {customerWorks.length === 0 && <p className="text-xs text-muted-foreground">No work history found</p>}
-                  <div className="grid grid-cols-3 gap-2 pt-2">
-                    <Button variant="outline" size="sm" onClick={() => window.location.href = `/customers/${customer._id}/onboarding`} className="text-indigo-600 border-indigo-200">
-                      <Sparkles className="w-4 h-4 mr-1 text-indigo-600" /> Onboarding
+                <div className="pt-3 border-t border-border space-y-2">
+                  {customerWorks.slice(0, 2).map((work) => <div key={work._id} className="rounded-lg bg-muted/40 p-2"><p className="text-xs sm:text-sm font-medium line-clamp-1">{work.title}</p><p className="text-[11px] text-muted-foreground truncate">{work.workType || work.type || "General"} • {work.status || "Pending"}</p></div>)}
+                  {customerWorks.length > 2 && <p className="text-[11px] text-muted-foreground">+{customerWorks.length - 2} more works</p>}
+                  {customerWorks.length === 0 && <p className="text-[11px] text-muted-foreground">No work history found</p>}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 pt-1.5">
+                    <Button variant="outline" size="sm" onClick={() => window.location.href = `/customers/${customer._id}/onboarding`} className="text-indigo-600 border-indigo-200 text-xs px-2 h-8">
+                      <Sparkles className="w-3.5 h-3.5 mr-1 text-indigo-600 shrink-0" /> <span className="truncate">Onboard</span>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => openClientLogin(customer)}><KeyRound className="w-4 h-4 mr-1" />Login</Button>
-                    <Button variant="outline" size="sm" onClick={() => openEditCustomer(customer)}><Edit3 className="w-4 h-4 mr-1" />Edit</Button>
+                    <Button
+                      variant={customer.accessControl?.isPortalLocked ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={() => setRechargeCustomer(customer)}
+                      className={`text-xs px-2 h-8 ${customer.accessControl?.isPortalLocked ? "bg-rose-600 text-white font-bold" : "text-emerald-700 border-emerald-300 font-semibold"}`}
+                    >
+                      <CreditCard className="w-3.5 h-3.5 mr-1 shrink-0" />
+                      <span className="truncate">{customer.accessControl?.isPortalLocked ? "Hold / Unlock" : "Recharge"}</span>
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => openClientLogin(customer)} className="text-xs px-2 h-8"><KeyRound className="w-3.5 h-3.5 mr-1 shrink-0" /><span className="truncate">Login</span></Button>
+                    <Button variant="outline" size="sm" onClick={() => openEditCustomer(customer)} className="text-xs px-2 h-8"><Edit3 className="w-3.5 h-3.5 mr-1 shrink-0" /><span className="truncate">Edit</span></Button>
                   </div>
                 </div>
               </motion.div>
@@ -861,31 +916,50 @@ export default function CustomersPage() {
         </motion.div>
       )}
 
-      <CustomerProfileDialog customer={selectedCustomer} onClose={() => setSelectedCustomer(null)} onEdit={openEditCustomer} formatCurrency={formatCurrency} branchName={branchName} getAssignedName={getAssignedName} works={selectedCustomer ? getCustomerWorks(selectedCustomer._id) : []} getAssignedUsers={getAssignedUsers} openClientLogin={openClientLogin} />
+      <CustomerProfileDialog
+        customer={selectedCustomer}
+        onClose={() => setSelectedCustomer(null)}
+        onEdit={openEditCustomer}
+        formatCurrency={formatCurrency}
+        branchName={branchName}
+        getAssignedName={getAssignedName}
+        works={selectedCustomer ? getCustomerWorks(selectedCustomer._id) : []}
+        getAssignedUsers={getAssignedUsers}
+        openClientLogin={openClientLogin}
+        openRechargeModal={setRechargeCustomer}
+      />
+
+      <RechargeAccessControlModal
+        open={!!rechargeCustomer}
+        customer={rechargeCustomer}
+        onClose={() => setRechargeCustomer(null)}
+        onSuccess={fetchCustomers}
+      />
 
       <CustomerFormDialog open={showCustomerModal} onClose={closeCustomerModal} editingCustomer={editingCustomer} newCust={newCust} setNewCust={setNewCust} supportingDocs={supportingDocs} setSupportingDocs={setSupportingDocs} branches={branches} branchesLoading={branchesLoading} savingCustomer={savingCustomer} departments={departments} rolesByDepartment={rolesByDepartment} filteredEmployees={filteredEmployees} handleSaveCustomer={handleSaveCustomer} />
 
       <Dialog open={!!loginCustomer} onOpenChange={closeClientLogin}>
-        <DialogContent className="w-[95vw] max-w-md">
-          <DialogHeader><DialogTitle>{loginCustomer?.userId ? "Manage Client Login" : "Create Client Login"}</DialogTitle></DialogHeader>
+        <DialogContent className="w-[96vw] max-w-md max-h-[92vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader><DialogTitle className="text-lg sm:text-xl">{loginCustomer?.userId ? "Manage Client Login" : "Create Client Login"}</DialogTitle></DialogHeader>
           {loginCustomer && <div className="space-y-4">
-            <div className="rounded-lg bg-muted/50 p-3"><p className="font-semibold">{loginCustomer.name}</p><p className="text-sm text-muted-foreground">{loginCustomer.businessType} • {branchName(loginCustomer.branchId || loginCustomer.branch)}</p></div>
+            <div className="rounded-lg bg-muted/50 p-3"><p className="font-semibold text-sm sm:text-base">{loginCustomer.name}</p><p className="text-xs sm:text-sm text-muted-foreground">{loginCustomer.businessType} • {branchName(loginCustomer.branchId || loginCustomer.branch)}</p></div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Login Status</p><p className="font-semibold">{loginCustomer.userId ? "Linked" : "Not Created"}</p></div>
-              <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Email</p><p className="font-semibold truncate">{clientEmail || "Required"}</p></div>
+              <div className="rounded-lg border p-2.5 sm:p-3"><p className="text-xs text-muted-foreground">Login Status</p><p className="font-semibold text-sm">{loginCustomer.userId ? "Linked" : "Not Created"}</p></div>
+              <div className="rounded-lg border p-2.5 sm:p-3"><p className="text-xs text-muted-foreground">Email</p><p className="font-semibold text-sm truncate">{clientEmail || "Required"}</p></div>
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">Client Email *</label>
+              <label className="text-xs sm:text-sm font-medium mb-1 block">Client Email *</label>
               <Input
                 type="email"
                 placeholder="client@example.com"
                 value={clientEmail}
                 onChange={(e) => setClientEmail(e.target.value)}
                 disabled={clientLoginLoading}
+                className="text-sm h-9"
               />
             </div>
             <div>
-              <label className="text-sm font-medium mb-1 block">
+              <label className="text-xs sm:text-sm font-medium mb-1 block">
                 Account Password <span className="text-muted-foreground text-xs font-normal">(Optional — leave blank to auto-generate & email)</span>
               </label>
               <Input
@@ -894,20 +968,21 @@ export default function CustomersPage() {
                 value={clientPassword}
                 onChange={(e) => setClientPassword(e.target.value)}
                 disabled={clientLoginLoading}
+                className="text-sm h-9"
               />
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-[11px] text-muted-foreground mt-1">
                 The password will be securely saved and emailed directly to the client with their portal link.
               </p>
             </div>
-            <div className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground flex gap-2">
-              <Lock className="w-4 h-4 shrink-0 text-amber-500" />
+            <div className="rounded-lg bg-muted/40 p-2.5 sm:p-3 text-xs text-muted-foreground flex gap-2">
+              <Lock className="w-4 h-4 shrink-0 text-amber-500 mt-0.5" />
               <span>Clients can also change their password anytime after logging into their portal under <b>Client Profile &rarr; Password</b>.</span>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <Button variant="outline" className="flex-1" onClick={closeClientLogin} disabled={clientLoginLoading}>
+            <div className="flex flex-col sm:flex-row gap-2 pt-1">
+              <Button variant="outline" className="w-full sm:w-auto sm:flex-initial h-9 text-xs sm:text-sm" onClick={closeClientLogin} disabled={clientLoginLoading}>
                 Cancel
               </Button>
-              <Button variant="gradient" className="flex-1" onClick={handleCreateClientLogin} disabled={clientLoginLoading}>
+              <Button variant="gradient" className="flex-1 font-medium text-xs sm:text-sm h-9" onClick={handleCreateClientLogin} disabled={clientLoginLoading}>
                 {clientLoginLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {clientLoginLoading ? "Processing..." : "Generate & Email Credentials"}
               </Button>
@@ -922,11 +997,11 @@ export default function CustomersPage() {
 function CustomerFormDialog({ open, onClose, editingCustomer, newCust, setNewCust, supportingDocs, setSupportingDocs, branches, branchesLoading, savingCustomer, departments, rolesByDepartment, filteredEmployees, handleSaveCustomer }: any) {
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="w-[96vw] max-w-5xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader><DialogTitle>{editingCustomer ? "Edit Customer / Add Missing Details" : "Add New Customer"}</DialogTitle></DialogHeader>
-        <div className="space-y-6">
+      <DialogContent className="w-[96vw] max-w-5xl max-h-[92vh] overflow-y-auto p-3.5 sm:p-6">
+        <DialogHeader><DialogTitle className="text-lg sm:text-xl">{editingCustomer ? "Edit Customer / Add Missing Details" : "Add New Customer"}</DialogTitle></DialogHeader>
+        <div className="space-y-5 sm:space-y-6">
           <SectionTitle icon={<Building2 className="w-4 h-4" />} title="Basic & Business Information" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input placeholder="Customer Name *" value={newCust.name} onChange={(e) => setNewCust({ ...newCust, name: e.target.value })} />
             <Input placeholder="Company Name" value={newCust.companyName} onChange={(e) => setNewCust({ ...newCust, companyName: e.target.value })} />
             <Input placeholder="Business Type *" value={newCust.businessType} onChange={(e) => setNewCust({ ...newCust, businessType: e.target.value })} />
@@ -936,16 +1011,16 @@ function CustomerFormDialog({ open, onClose, editingCustomer, newCust, setNewCus
           </div>
 
           <SectionTitle icon={<Phone className="w-4 h-4" />} title="Contact & Address" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Input placeholder="Contact Number *" value={newCust.contactNumber} onChange={(e) => setNewCust({ ...newCust, contactNumber: e.target.value })} />
             <Input type="email" placeholder="Email Address" value={newCust.email} onChange={(e) => setNewCust({ ...newCust, email: e.target.value })} />
             <Input placeholder="City" value={newCust.city} onChange={(e) => setNewCust({ ...newCust, city: e.target.value })} />
             <Input placeholder="State" value={newCust.state} onChange={(e) => setNewCust({ ...newCust, state: e.target.value })} />
-            <Input className="md:col-span-2" placeholder="Full Address" value={newCust.address} onChange={(e) => setNewCust({ ...newCust, address: e.target.value })} />
+            <Input className="sm:col-span-2" placeholder="Full Address" value={newCust.address} onChange={(e) => setNewCust({ ...newCust, address: e.target.value })} />
           </div>
 
           <SectionTitle icon={<User className="w-4 h-4" />} title="Branch & Employee Assignment" />
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Select value={newCust.branchId} disabled={branchesLoading || savingCustomer} onValueChange={(value) => setNewCust({ ...newCust, branchId: value, assignedDepartment: "", assignedRole: "", assignedTo: "" })}><SelectTrigger><SelectValue placeholder={branchesLoading ? "Loading branches..." : "Select Branch *"} /></SelectTrigger><SelectContent>{branches.map((branch: Branch) => { const value = getBranchValue(branch); return <SelectItem key={value} value={value}>{getBranchLabel(branch)}</SelectItem>; })}</SelectContent></Select>
             <Select value={newCust.assignedDepartment} onValueChange={(value) => setNewCust({ ...newCust, assignedDepartment: value, assignedRole: "", assignedTo: "" })}><SelectTrigger><SelectValue placeholder="Department" /></SelectTrigger><SelectContent>{departments.map((dept: string) => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}</SelectContent></Select>
             <Select value={newCust.assignedRole} disabled={!newCust.assignedDepartment} onValueChange={(value) => setNewCust({ ...newCust, assignedRole: value, assignedTo: "" })}><SelectTrigger><SelectValue placeholder="Role" /></SelectTrigger><SelectContent>{rolesByDepartment.map((role: string) => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent></Select>
@@ -954,10 +1029,10 @@ function CustomerFormDialog({ open, onClose, editingCustomer, newCust, setNewCus
 
           <SectionTitle icon={<Package className="w-4 h-4" />} title="Services, Package & Notes" />
           <Input placeholder="Package / Plan" value={newCust.package} onChange={(e) => setNewCust({ ...newCust, package: e.target.value })} />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-            {requirementOptions.map((req) => <div key={req} className="flex items-center gap-2 rounded-lg border p-2"><Checkbox id={`cust-${req}`} checked={newCust.requirements.includes(req)} onCheckedChange={(checked) => setNewCust({ ...newCust, requirements: checked ? [...newCust.requirements, req] : newCust.requirements.filter((item: string) => item !== req) })} /><label htmlFor={`cust-${req}`} className="text-sm cursor-pointer">{req}</label></div>)}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {requirementOptions.map((req) => <div key={req} className="flex items-center gap-2 rounded-lg border p-2"><Checkbox id={`cust-${req}`} checked={newCust.requirements.includes(req)} onCheckedChange={(checked) => setNewCust({ ...newCust, requirements: checked ? [...newCust.requirements, req] : newCust.requirements.filter((item: string) => item !== req) })} /><label htmlFor={`cust-${req}`} className="text-xs sm:text-sm cursor-pointer truncate">{req}</label></div>)}
           </div>
-          <textarea className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Internal notes / client requirements / communication summary" value={newCust.notes} onChange={(e) => setNewCust({ ...newCust, notes: e.target.value })} />
+          <textarea className="min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-xs sm:text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" placeholder="Internal notes / client requirements / communication summary" value={newCust.notes} onChange={(e) => setNewCust({ ...newCust, notes: e.target.value })} />
 
           <SectionTitle icon={<UploadCloud className="w-4 h-4" />} title="Supporting Documents" />
           <div className="rounded-xl border border-dashed border-border bg-muted/30 p-4">
@@ -973,7 +1048,7 @@ function CustomerFormDialog({ open, onClose, editingCustomer, newCust, setNewCus
   );
 }
 
-function CustomerProfileDialog({ customer, onClose, onEdit, formatCurrency, branchName, getAssignedName, works, getAssignedUsers, openClientLogin }: any) {
+function CustomerProfileDialog({ customer, onClose, onEdit, formatCurrency, branchName, getAssignedName, works, getAssignedUsers, openClientLogin, openRechargeModal }: any) {
   if (!customer) return null;
   const primaryPhone = customer.contactNumbers?.[0] || "";
   const whatsappPhone = normalizePhoneForWhatsApp(primaryPhone);
@@ -1102,58 +1177,84 @@ function CustomerProfileDialog({ customer, onClose, onEdit, formatCurrency, bran
 
   return (
     <Dialog open={!!customer} onOpenChange={onClose}>
-      <DialogContent className="w-[96vw] max-w-6xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader><DialogTitle>Customer Dashboard</DialogTitle></DialogHeader>
-        <div className="space-y-5">
+      <DialogContent className="w-[96vw] max-w-6xl max-h-[92vh] overflow-y-auto p-3.5 sm:p-6">
+        <DialogHeader><DialogTitle className="text-lg sm:text-xl">Customer Dashboard</DialogTitle></DialogHeader>
+        <div className="space-y-4 sm:space-y-5">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-border">
-            <div className="flex items-center gap-4 min-w-0">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               {customer.brandProfile?.logoUrl ? (
                 <img
                   src={customer.brandProfile.logoUrl}
                   alt={customer.name}
-                  className="w-16 h-16 shrink-0 rounded-xl object-contain border border-border bg-white p-1"
+                  className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-xl object-contain border border-border bg-white p-1"
                 />
               ) : (
-                <div className="w-16 h-16 shrink-0 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-2xl">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 shrink-0 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-xl sm:text-2xl">
                   {customer.name?.charAt(0)?.toUpperCase() || "C"}
                 </div>
               )}
               <div className="min-w-0">
-                <h2 className="text-xl md:text-2xl font-heading font-bold truncate">{customer.name}</h2>
-                <p className="text-muted-foreground text-sm truncate">{customer.companyName || customer.businessType || "Business"} • {customer.city || "—"}</p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  <Badge variant={customer.status === "Inactive" ? "destructive" : "default"}>{customer.status || "Active"}</Badge>
-                  <Badge variant="outline" className="font-mono text-[10px]">ID: {customer._id}</Badge>
-                  {customer.package && <Badge variant="outline"><Package className="w-3 h-3 mr-1" />{customer.package}</Badge>}
+                <h2 className="text-lg sm:text-xl md:text-2xl font-heading font-bold truncate">{customer.name}</h2>
+                <p className="text-muted-foreground text-xs sm:text-sm truncate">{customer.companyName || customer.businessType || "Business"} • {customer.city || "—"}</p>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  <Badge variant={customer.status === "Inactive" ? "destructive" : "default"} className="text-[10px] px-1.5 py-0.5">{customer.status || "Active"}</Badge>
+                  <Badge variant="outline" className="font-mono text-[9px] px-1.5 py-0.5">ID: {customer._id}</Badge>
+                  {customer.package && <Badge variant="outline" className="text-[10px] px-1.5 py-0.5"><Package className="w-3 h-3 mr-1" />{customer.package}</Badge>}
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => window.location.href = `/customers/${customer._id}/onboarding`} className="text-indigo-600 border-indigo-200">
-                <Sparkles className="w-4 h-4 mr-1 text-indigo-600" /> Onboarding Wizard
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:flex-wrap gap-1.5 sm:gap-2 w-full lg:w-auto">
+              <Button variant="outline" size="sm" onClick={() => window.location.href = `/customers/${customer._id}/onboarding`} className="text-indigo-600 border-indigo-200 text-xs px-2 h-8 sm:h-9">
+                <Sparkles className="w-3.5 h-3.5 mr-1 text-indigo-600 shrink-0" /> <span className="truncate">Onboarding</span>
+              </Button>
+              <Button
+                variant={customer.accessControl?.isPortalLocked ? "destructive" : "outline"}
+                size="sm"
+                onClick={() => openRechargeModal(customer)}
+                className={`text-xs px-2 h-8 sm:h-9 ${customer.accessControl?.isPortalLocked ? "bg-rose-600 text-white font-bold" : "text-emerald-700 border-emerald-300 font-semibold"}`}
+              >
+                <CreditCard className="w-3.5 h-3.5 mr-1 shrink-0" />
+                <span className="truncate">{customer.accessControl?.isPortalLocked ? "Hold / Unlock" : "Recharge"}</span>
               </Button>
               <ContextPreviewButton customerId={customer._id} />
-              <Button variant="outline" size="sm" onClick={() => primaryPhone && window.open(`tel:${primaryPhone}`)} disabled={!primaryPhone}><Phone className="w-4 h-4 mr-1" />Call</Button>
-              <Button variant="success" size="sm" onClick={() => whatsappPhone && window.open(`https://wa.me/${whatsappPhone}`, "_blank")} disabled={!whatsappPhone}><MessageSquare className="w-4 h-4 mr-1" />WhatsApp</Button>
-              <Button variant="outline" size="sm" onClick={() => openClientLogin(customer)}><KeyRound className="w-4 h-4 mr-1" />Login</Button>
-              <Button variant="outline" size="sm" onClick={() => onEdit(customer)}><Edit3 className="w-4 h-4 mr-1" />Edit</Button>
-              <Button variant="gradient" size="sm" onClick={downloadReport}><Download className="w-4 h-4 mr-1" />Report</Button>
+              <Button variant="outline" size="sm" onClick={() => primaryPhone && window.open(`tel:${primaryPhone}`)} disabled={!primaryPhone} className="text-xs px-2 h-8 sm:h-9"><Phone className="w-3.5 h-3.5 mr-1 shrink-0" />Call</Button>
+              <Button variant="success" size="sm" onClick={() => whatsappPhone && window.open(`https://wa.me/${whatsappPhone}`, "_blank")} disabled={!whatsappPhone} className="text-xs px-2 h-8 sm:h-9"><MessageSquare className="w-3.5 h-3.5 mr-1 shrink-0" />WhatsApp</Button>
+              <Button variant="outline" size="sm" onClick={() => openClientLogin(customer)} className="text-xs px-2 h-8 sm:h-9"><KeyRound className="w-3.5 h-3.5 mr-1 shrink-0" />Login</Button>
+              <Button variant="outline" size="sm" onClick={() => onEdit(customer)} className="text-xs px-2 h-8 sm:h-9"><Edit3 className="w-3.5 h-3.5 mr-1 shrink-0" />Edit</Button>
+              <Button variant="gradient" size="sm" onClick={downloadReport} className="text-xs px-2 h-8 sm:h-9"><Download className="w-3.5 h-3.5 mr-1 shrink-0" />Report</Button>
             </div>
           </div>
+
+          {customer.accessControl?.isPortalLocked && (
+            <div className="rounded-xl border border-rose-300 bg-rose-50 p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-rose-950">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-rose-200 text-rose-700 flex items-center justify-center shrink-0">
+                  <ShieldAlert className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <span className="font-bold text-xs sm:text-sm block">Client Portal & Active Marketing Services Are Suspended</span>
+                  <span className="text-[11px] sm:text-xs text-rose-700">{customer.accessControl?.lockReason || "Payment Overdue"} • Client lock screen is active.</span>
+                </div>
+              </div>
+              <Button size="sm" variant="destructive" onClick={() => openRechargeModal(customer)} className="font-bold text-xs w-full sm:w-auto h-8 shrink-0">
+                Manage Hold / Unlock
+              </Button>
+            </div>
+          )}
 
           <AgentReadinessPanel customerId={customer._id} />
 
           <SocialIntegrationsPanel customer={customer} />
 
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-3"><ProfileStat label="Branch" value={branchName(customer.branchId || customer.branch)} /><ProfileStat label="Paid" value={formatCurrency(customer.totalPaid)} success /><ProfileStat label="Pending" value={formatCurrency(customer.totalPending)} warning /><ProfileStat label="Active Works" value={activeWorks} /><ProfileStat label="Completed" value={completedWorks} success /><ProfileStat label="Documents" value={documents.length} /></div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3"><ProfileStat label="Branch" value={branchName(customer.branchId || customer.branch)} /><ProfileStat label="Paid" value={formatCurrency(customer.totalPaid)} success /><ProfileStat label="Pending" value={formatCurrency(customer.totalPending)} warning /><ProfileStat label="Active Works" value={activeWorks} /><ProfileStat label="Completed" value={completedWorks} success /><ProfileStat label="Documents" value={documents.length} /></div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <Panel title="Contact & Business" icon={<Building2 className="w-4 h-4" />}><InfoLine icon={<Phone className="w-4 h-4" />} text={customer.contactNumbers?.join(", ") || "—"} /><InfoLine icon={<Mail className="w-4 h-4" />} text={customer.email || "Not provided"} /><InfoLine icon={<MapPin className="w-4 h-4" />} text={[customer.address, customer.city, customer.state].filter(Boolean).join(", ") || "—"} /><InfoLine icon={<ShieldCheck className="w-4 h-4" />} text={`PAN: ${customer.panNumber || "—"}`} /><InfoLine icon={<FileText className="w-4 h-4" />} text={`GST: ${customer.gstNumber || "—"}`} /></Panel>
-            <Panel title="Login & Communication" icon={<KeyRound className="w-4 h-4" />}><InfoLine icon={<Lock className="w-4 h-4" />} text={customer.userId ? "Client login linked" : "Client login not created"} /><InfoLine icon={<Mail className="w-4 h-4" />} text="Email management ready" /><InfoLine icon={<MessageSquare className="w-4 h-4" />} text="WhatsApp / call tracking ready" /><Button variant="outline" size="sm" className="w-full mt-2" onClick={() => openClientLogin(customer)}>Manage Login</Button></Panel>
-            <Panel title="Notes" icon={<ClipboardList className="w-4 h-4" />}><p className="text-sm text-muted-foreground whitespace-pre-wrap">{customer.notes || "No notes added yet."}</p></Panel>
+            <Panel title="Login & Communication" icon={<KeyRound className="w-4 h-4" />}><InfoLine icon={<Lock className="w-4 h-4" />} text={customer.userId ? "Client login linked" : "Client login not created"} /><InfoLine icon={<Mail className="w-4 h-4" />} text="Email management ready" /><InfoLine icon={<MessageSquare className="w-4 h-4" />} text="WhatsApp / call tracking ready" /><Button variant="outline" size="sm" className="w-full mt-2 text-xs h-8" onClick={() => openClientLogin(customer)}>Manage Login</Button></Panel>
+            <Panel title="Notes" icon={<ClipboardList className="w-4 h-4" />}><p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap">{customer.notes || "No notes added yet."}</p></Panel>
           </div>
 
-          <Panel title="Selected Services" icon={<Package className="w-4 h-4" />}><div className="flex flex-wrap gap-2">{customer.requirements?.length ? customer.requirements.map((req: string) => <Badge key={req} variant="secondary">{req}</Badge>) : <p className="text-sm text-muted-foreground">No services added</p>}</div></Panel>
+          <Panel title="Selected Services" icon={<Package className="w-4 h-4" />}><div className="flex flex-wrap gap-1.5 sm:gap-2">{customer.requirements?.length ? customer.requirements.map((req: string) => <Badge key={req} variant="secondary" className="text-xs">{req}</Badge>) : <p className="text-xs sm:text-sm text-muted-foreground">No services added</p>}</div></Panel>
 
           <Panel title="Report Content" icon={<ClipboardList className="w-4 h-4" />}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
@@ -1180,15 +1281,34 @@ function CustomerProfileDialog({ customer, onClose, onEdit, formatCurrency, bran
 }
 
 function StatCard({ title, value, icon, highlight }: { title: string; value: string | number; icon?: React.ReactNode; highlight?: boolean }) {
-  return <div className={highlight ? "p-5 rounded-2xl gradient-primary text-primary-foreground shadow-card" : "p-5 rounded-2xl bg-card border border-border shadow-card"}><div className="flex items-center justify-between gap-3"><div><p className="text-2xl md:text-3xl font-heading font-bold">{value}</p><p className={highlight ? "text-sm text-primary-foreground/80" : "text-sm text-muted-foreground"}>{title}</p></div>{icon && <div className={highlight ? "text-primary-foreground/80" : "text-muted-foreground"}>{icon}</div>}</div></div>;
+  return (
+    <div className={highlight ? "p-3 sm:p-4 md:p-5 rounded-2xl gradient-primary text-primary-foreground shadow-card" : "p-3 sm:p-4 md:p-5 rounded-2xl bg-card border border-border shadow-card"}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-lg sm:text-2xl md:text-3xl font-heading font-bold truncate">{value}</p>
+          <p className={highlight ? "text-xs sm:text-sm text-primary-foreground/80 truncate" : "text-xs sm:text-sm text-muted-foreground truncate"}>{title}</p>
+        </div>
+        {icon && <div className={highlight ? "text-primary-foreground/80 shrink-0" : "text-muted-foreground shrink-0"}>{icon}</div>}
+      </div>
+    </div>
+  );
 }
 
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) { return <div className="flex items-center gap-2 text-sm font-semibold text-foreground border-b pb-2">{icon}{title}</div>; }
-function Panel({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) { return <div className="rounded-xl border border-border bg-card p-4"><h4 className="font-semibold mb-3 text-sm flex items-center gap-2">{icon}{title}</h4>{children}</div>; }
+function Panel({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) { return <div className="rounded-xl border border-border bg-card p-3.5 sm:p-4"><h4 className="font-semibold mb-3 text-sm flex items-center gap-2">{icon}{title}</h4>{children}</div>; }
 function EmptyMini({ text }: { text: string }) { return <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">{text}</div>; }
-function InfoRow({ icon, text }: { icon: React.ReactNode; text: string }) { return <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0"><span className="shrink-0">{icon}</span><span className="truncate">{text}</span></div>; }
-function InfoLine({ icon, text }: { icon: React.ReactNode; text: string }) { return <div className="flex items-start gap-2 text-sm min-w-0 mb-2 last:mb-0"><span className="text-muted-foreground mt-0.5 shrink-0">{icon}</span><span className="break-words">{text}</span></div>; }
-function ProfileStat({ label, value, success, warning }: { label: string; value: string | number; success?: boolean; warning?: boolean }) { const className = success ? "p-3 rounded-lg bg-success/10 border border-success/30" : warning ? "p-3 rounded-lg bg-warning/10 border border-warning/30" : "p-3 rounded-lg bg-card border border-border"; const valueClassName = success ? "text-xl font-heading font-bold mt-1 text-success" : warning ? "text-xl font-heading font-bold mt-1 text-warning" : "text-xl font-heading font-bold mt-1"; return <div className={className}><p className="text-xs text-muted-foreground">{label}</p><p className={valueClassName}>{value}</p></div>; }
+function InfoRow({ icon, text }: { icon: React.ReactNode; text: string }) { return <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground min-w-0"><span className="shrink-0">{icon}</span><span className="truncate">{text}</span></div>; }
+function InfoLine({ icon, text }: { icon: React.ReactNode; text: string }) { return <div className="flex items-start gap-2 text-xs sm:text-sm min-w-0 mb-2 last:mb-0"><span className="text-muted-foreground mt-0.5 shrink-0">{icon}</span><span className="break-words">{text}</span></div>; }
+function ProfileStat({ label, value, success, warning }: { label: string; value: string | number; success?: boolean; warning?: boolean }) {
+  const className = success ? "p-2.5 sm:p-3 rounded-xl bg-success/10 border border-success/30" : warning ? "p-2.5 sm:p-3 rounded-xl bg-warning/10 border border-warning/30" : "p-2.5 sm:p-3 rounded-xl bg-card border border-border";
+  const valueClassName = success ? "text-base sm:text-xl font-heading font-bold mt-0.5 sm:mt-1 text-success truncate" : warning ? "text-base sm:text-xl font-heading font-bold mt-0.5 sm:mt-1 text-warning truncate" : "text-base sm:text-xl font-heading font-bold mt-0.5 sm:mt-1 truncate";
+  return (
+    <div className={className}>
+      <p className="text-[11px] sm:text-xs text-muted-foreground truncate">{label}</p>
+      <p className={valueClassName}>{value}</p>
+    </div>
+  );
+}
 function AgentReadinessPanel({ customerId }: { customerId: string }) {
   const [readiness, setReadiness] = useState<any>(null);
 
@@ -1211,17 +1331,17 @@ function AgentReadinessPanel({ customerId }: { customerId: string }) {
   ];
 
   return (
-    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-      <div className="flex items-center justify-between">
+    <div className="p-3 sm:p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-          <Sparkles className="w-4 h-4 text-indigo-600" /> Client AI Readiness Breakdown
+          <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" /> Client AI Readiness Breakdown
         </span>
-        <Badge className={readiness.isAIReady ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}>
+        <Badge className={`text-xs self-start sm:self-auto ${readiness.isAIReady ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
           Overall: {readiness.overallScore}% {readiness.isAIReady ? "✓ AI Ready" : "⚠️ Needs Profile Info"}
         </Badge>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-2 text-xs">
         {agentKeys.map(({ key, label }) => {
           const item = readiness.agents?.[key] || { score: 0, ready: false, missingRequired: [] };
           return (
@@ -1399,15 +1519,15 @@ function SocialIntegrationsPanel({ customer }: { customer: any }) {
   };
 
   return (
-    <div className="p-4 rounded-xl bg-slate-900 text-white border border-indigo-950 space-y-3 shadow-sm">
-      <div className="flex items-center justify-between">
+    <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900 text-white border border-indigo-950 space-y-3 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
         <div className="flex items-center gap-2">
-          <Share2 className="h-4 w-4 text-indigo-400" />
+          <Share2 className="h-4 w-4 text-indigo-400 shrink-0" />
           <span className="font-bold text-xs uppercase tracking-wider text-slate-100">
             Connected Social Accounts & Auto-Publish APIs
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
           <Button
             size="sm"
             variant="outline"
@@ -1431,18 +1551,18 @@ function SocialIntegrationsPanel({ customer }: { customer: any }) {
                 toast({ title: "Seeding error", description: err.message, variant: "destructive" });
               }
             }}
-            className="h-7 text-xs bg-emerald-700 hover:bg-emerald-800 text-white border-0"
+            className="h-7 text-xs bg-emerald-700 hover:bg-emerald-800 text-white border-0 flex-1 sm:flex-initial"
           >
-            <Sparkles className="h-3.5 w-3.5 mr-1" /> Seed Demo Data
+            <Sparkles className="h-3.5 w-3.5 mr-1 shrink-0" /> Seed Demo Data
           </Button>
 
           <Button
             size="sm"
             variant="outline"
             onClick={() => setOpen(true)}
-            className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white border-0"
+            className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white border-0 flex-1 sm:flex-initial"
           >
-            <Edit3 className="h-3.5 w-3.5 mr-1" /> Configure Credentials
+            <Edit3 className="h-3.5 w-3.5 mr-1 shrink-0" /> Configure Credentials
           </Button>
         </div>
       </div>

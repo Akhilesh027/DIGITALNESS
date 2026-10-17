@@ -2,6 +2,9 @@ import React, { useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Navbar } from "./Navbar";
+import { useAuth } from "../../context/AuthContext";
+import { LockedPortalView } from "../LockedPortalView";
+import { RechargeCountdownBanner } from "../RechargeCountdownBanner";
 
 const PAGE_TITLES = {
   "/": "Overview & Analytics",
@@ -9,12 +12,22 @@ const PAGE_TITLES = {
   "/team": "Dedicated Agency Team",
   "/attachments": "Project Files & Brand Assets",
   "/payments": "Invoices & Retainers",
+  "/proposals": "Proposals & Agreements",
   "/profile": "Company & Client Profile",
+  "/upcoming": "Upcoming AI Suite & Demos",
 };
 
 export const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
+  const { customer } = useAuth();
+
+  const isPortalLocked = Boolean(customer?.accessControl?.isPortalLocked);
+
+  // If portal access is held due to overdue payment or admin hold, lock entire interface
+  if (isPortalLocked) {
+    return <LockedPortalView />;
+  }
 
   const currentTitle = PAGE_TITLES[location.pathname] || "Digitalness Portal";
 
@@ -26,6 +39,7 @@ export const AppLayout = () => {
       {/* Main Content Area */}
       <div className="flex-1 lg:pl-72 flex flex-col min-w-0">
         <Navbar onOpenSidebar={() => setSidebarOpen(true)} pageTitle={currentTitle} />
+        <RechargeCountdownBanner />
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">
           <Outlet />

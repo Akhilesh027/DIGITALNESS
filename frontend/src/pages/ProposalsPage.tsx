@@ -2136,8 +2136,8 @@ export default function ProposalsPage() {
                         type="button"
                         onClick={() => setBillingForm((prev) => ({ ...prev, billingCycle: cycle.id }))}
                         className={`p-3.5 rounded-xl border text-left transition flex flex-col justify-between ${isSelected
-                            ? "bg-primary/10 border-primary text-primary shadow-sm ring-2 ring-primary/20"
-                            : "bg-card hover:bg-muted/40 border-border text-foreground"
+                          ? "bg-primary/10 border-primary text-primary shadow-sm ring-2 ring-primary/20"
+                          : "bg-card hover:bg-muted/40 border-border text-foreground"
                           }`}
                       >
                         <div className="flex items-center justify-between mb-2">

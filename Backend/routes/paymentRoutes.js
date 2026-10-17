@@ -272,11 +272,37 @@ router.post(
         }
       }
 
-      // 3. Update Customer's totalPaid & totalPending balances
+      // 3. Update Customer's totalPaid & totalPending balances and unlock portal if on hold
+      let portalUnlocked = false;
       if (resolvedStatus === "Completed") {
         customerDoc.totalPaid = (customerDoc.totalPaid || 0) + numAmount;
         customerDoc.totalPending = Math.max(0, (customerDoc.totalPending || 0) - numAmount);
+
+        if (customerDoc.accessControl?.isPortalLocked) {
+          customerDoc.accessControl = {
+            isPortalLocked: false,
+            lockReason: "",
+            lockedAt: null,
+            lockedBy: null,
+            servicesSuspended: false,
+            lockMessage: "",
+            holdType: "NONE",
+          };
+          portalUnlocked = true;
+        }
+
         await customerDoc.save();
+
+        if (portalUnlocked) {
+          const io = req.app.get("io");
+          if (io) {
+            io.to(`customer_${customerDoc._id}`).emit("portal_access_restored", {
+              customerId: customerDoc._id,
+              isPortalLocked: false,
+              message: "Payment received. Client portal holding has been removed and services restored.",
+            });
+          }
+        }
       }
 
       // 4. Audit Log
@@ -554,12 +580,38 @@ router.patch("/:id/verify", protect, async (req, res) => {
       }
     }
 
-    // Reconcile customer totals
+    // Reconcile customer totals & Auto-remove holding / unlock client portal
     const customerDoc = await Customer.findById(payment.customer);
+    let portalUnlocked = false;
     if (customerDoc) {
       customerDoc.totalPaid = (customerDoc.totalPaid || 0) + numAmount;
       customerDoc.totalPending = Math.max(0, (customerDoc.totalPending || 0) - numAmount);
+
+      // Auto-remove holding when admin verifies and approves the payment proof
+      if (customerDoc.accessControl?.isPortalLocked) {
+        customerDoc.accessControl = {
+          isPortalLocked: false,
+          lockReason: "",
+          lockedAt: null,
+          lockedBy: null,
+          servicesSuspended: false,
+          lockMessage: "",
+          holdType: "NONE",
+        };
+        portalUnlocked = true;
+      }
+
       await customerDoc.save();
+
+      // Emit real-time WebSocket event to restore portal access immediately
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`customer_${customerDoc._id}`).emit("portal_access_restored", {
+          customerId: customerDoc._id,
+          isPortalLocked: false,
+          message: "Payment proof verified and approved. Portal access and services have been restored.",
+        });
+      }
     }
 
     // Audit log
@@ -571,15 +623,28 @@ router.patch("/:id/verify", protect, async (req, res) => {
         action: "MANUAL_PAYMENT_VERIFIED",
         entityType: "Payment",
         entityId: payment._id,
-        details: `Verified manual payment of ₹${numAmount.toLocaleString("en-IN")} (Ref: ${payment.reference}) for ${customerDoc?.name || "Customer"}.`,
+        details: `Verified manual payment of ₹${numAmount.toLocaleString("en-IN")} (Ref: ${payment.reference}) for ${customerDoc?.name || "Customer"}.${portalUnlocked ? " Client portal holding automatically removed." : ""}`,
       });
+
+      if (portalUnlocked) {
+        await AuditLog.create({
+          actorType: req.user?.role || "Admin",
+          actorId: req.user?._id || null,
+          actorName: req.user?.name || "Admin",
+          action: "CLIENT_PORTAL_UNLOCKED",
+          entityType: "Customer",
+          entityId: customerDoc._id,
+          details: `Client portal holding removed and services restored upon payment verification of ₹${numAmount.toLocaleString("en-IN")}.`,
+        });
+      }
     } catch (e) {}
 
     // Send confirmation alert
     try {
       if (customerDoc) {
         const remainingBal = Math.max(0, Number(customerDoc.totalPending || 0));
-        const confirmMsg = `Dear ${customerDoc.name},\n\nYour payment of ₹${numAmount.toLocaleString("en-IN")} via ${payment.method} (Ref: ${payment.reference}) has been verified and approved.${updatedInvoice ? ` Linked to Invoice ${updatedInvoice.invoiceNumber}.` : ""}${remainingBal > 0 ? ` Remaining balance: ₹${remainingBal.toLocaleString("en-IN")}.` : " All outstanding dues are cleared!"}\n\nThank you!\n- Digitalness Finance`;
+        const unlockMsg = portalUnlocked ? " Your client portal access and agency services have been fully restored!" : "";
+        const confirmMsg = `Dear ${customerDoc.name},\n\nYour payment of ₹${numAmount.toLocaleString("en-IN")} via ${payment.method} (Ref: ${payment.reference}) has been verified and approved by accounts.${unlockMsg}${updatedInvoice ? ` Linked to Invoice ${updatedInvoice.invoiceNumber}.` : ""}${remainingBal > 0 ? ` Remaining balance: ₹${remainingBal.toLocaleString("en-IN")}.` : " All outstanding dues are cleared!"}\n\nThank you for choosing Digitalness!\n- Digitalness Finance`;
 
         await Communication.create({
           customerId: customerDoc._id,
@@ -589,7 +654,7 @@ router.patch("/:id/verify", protect, async (req, res) => {
           channel: "WhatsApp",
           direction: "Outbound",
           status: "Sent",
-          subject: `Payment Verified: ₹${numAmount.toLocaleString("en-IN")}`,
+          subject: portalUnlocked ? `Payment Verified & Portal Access Restored: ₹${numAmount.toLocaleString("en-IN")}` : `Payment Verified: ₹${numAmount.toLocaleString("en-IN")}`,
           message: confirmMsg,
           content: confirmMsg,
           by: req.user?._id || null,
@@ -605,10 +670,13 @@ router.patch("/:id/verify", protect, async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Payment verified successfully and reconciled with invoice.",
+      message: portalUnlocked
+        ? "Payment verified successfully. Client portal holding has been removed and access restored."
+        : "Payment verified successfully and reconciled with invoice.",
       data: populatedPayment,
       payment: populatedPayment,
       invoice: updatedInvoice,
+      portalUnlocked,
     });
   } catch (error) {
     console.error("[Payment Verify Error]:", error);

@@ -1134,3 +1134,376 @@ exports.seedGlowNestQA = async (req, res) => {
     });
   }
 };
+
+/**
+ * POST /api/customers/:id/lock-portal
+ * Holds client portal access, stops marketing services, and broadcasts real-time eviction.
+ */
+exports.lockCustomerPortal = async (req, res) => {
+  try {
+    const {
+      lockReason = "Payment Overdue",
+      lockMessage = "Your marketing services and portal access are currently on hold due to pending payment. Please settle your outstanding dues to restore full access immediately.",
+      holdType = "PAYMENT_OVERDUE",
+      suspendServices = true,
+      sendAlert = true,
+      alertChannel = "WhatsApp",
+    } = req.body;
+
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "Customer not found." });
+    }
+
+    customer.accessControl = {
+      isPortalLocked: true,
+      lockReason,
+      lockMessage,
+      holdType,
+      lockedAt: new Date(),
+      lockedBy: req.user?._id || null,
+      servicesSuspended: suspendServices !== false,
+    };
+
+    await customer.save();
+
+    // 1. Real-time WebSocket Eviction to customer room
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`customer_${customer._id}`).emit("portal_access_suspended", {
+        customerId: customer._id,
+        isPortalLocked: true,
+        lockReason,
+        lockMessage,
+        holdType,
+        totalPending: customer.totalPending || 0,
+        lockedAt: customer.accessControl.lockedAt,
+      });
+    }
+
+    // 2. Audit Trail
+    const AuditLog = require("../models/AuditLog");
+    try {
+      await AuditLog.create({
+        actorType: req.user?.role || "Admin",
+        actorId: req.user?._id || null,
+        actorName: req.user?.name || "Admin",
+        action: "CLIENT_PORTAL_LOCKED",
+        entityType: "Customer",
+        entityId: customer._id,
+        details: `Suspended portal access and services for ${customer.name}. Reason: ${lockReason}. Hold Type: ${holdType}. Total Pending: ₹${Number(customer.totalPending || 0).toLocaleString("en-IN")}.`,
+      });
+    } catch (e) {}
+
+    // 3. Optional WhatsApp / Email Alert
+    let alertRecord = null;
+    if (sendAlert) {
+      const Communication = require("../models/Communication");
+      try {
+        const targetPhone = customer.contactNumbers?.[0] || customer.phone || "";
+        const alertMsg = `Dear ${customer.name},\n\nNotice: Your Digitalness Client Portal access and active agency services have been placed on hold due to pending dues (₹${Number(customer.totalPending || 0).toLocaleString("en-IN")}).\n\nTo restore full services immediately, kindly clear the outstanding invoice or contact your Account Director.\n\nThank you,\nDigitalness Finance Team`;
+
+        alertRecord = await Communication.create({
+          customerId: customer._id,
+          recipientType: "Customer",
+          recipientId: customer._id,
+          recipientName: customer.name,
+          channel: alertChannel,
+          direction: "Outbound",
+          status: "Sent",
+          subject: "Service Hold & Payment Notice",
+          message: alertMsg,
+          content: alertMsg,
+          by: req.user?._id || null,
+          byName: req.user?.name || "Finance Admin",
+          metadata: {
+            autoTriggered: false,
+            trigger: "PORTAL_HOLD_ALERT",
+            totalPending: customer.totalPending || 0,
+            lockReason,
+            recipientPhone: targetPhone,
+          },
+        });
+      } catch (e) {}
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Portal access locked and services held for ${customer.name}.`,
+      data: {
+        customerId: customer._id,
+        accessControl: customer.accessControl,
+        alertSent: Boolean(alertRecord),
+      },
+    });
+  } catch (error) {
+    console.error("[Lock Portal Error]:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /api/customers/:id/unlock-portal
+ * Restores client portal access and resumes services.
+ */
+exports.unlockCustomerPortal = async (req, res) => {
+  try {
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "Customer not found." });
+    }
+
+    customer.accessControl = {
+      isPortalLocked: false,
+      lockReason: "",
+      lockedAt: null,
+      lockedBy: null,
+      servicesSuspended: false,
+      lockMessage: "",
+      holdType: "NONE",
+    };
+
+    await customer.save();
+
+    // Real-time WebSocket Event
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`customer_${customer._id}`).emit("portal_access_restored", {
+        customerId: customer._id,
+        isPortalLocked: false,
+        message: "Portal access and services have been restored.",
+      });
+    }
+
+    // Audit Trail
+    const AuditLog = require("../models/AuditLog");
+    try {
+      await AuditLog.create({
+        actorType: req.user?.role || "Admin",
+        actorId: req.user?._id || null,
+        actorName: req.user?.name || "Admin",
+        action: "CLIENT_PORTAL_UNLOCKED",
+        entityType: "Customer",
+        entityId: customer._id,
+        details: `Restored portal access and active services for ${customer.name}.`,
+      });
+    } catch (e) {}
+
+    return res.status(200).json({
+      success: true,
+      message: `Portal access and services successfully restored for ${customer.name}.`,
+      data: {
+        customerId: customer._id,
+        accessControl: customer.accessControl,
+      },
+    });
+  } catch (error) {
+    console.error("[Unlock Portal Error]:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /api/customers/:id/recharge
+ * Extends client subscription / retainer validity and updates service bundle.
+ */
+exports.rechargeCustomerPlan = async (req, res) => {
+  try {
+    const {
+      planName,
+      days = 30,
+      months = 0,
+      validUntil,
+      monthlyAmount,
+      servicesIncluded,
+      billingFrequency,
+      autoUnlock = true,
+      notes = "",
+    } = req.body;
+
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "Customer not found." });
+    }
+
+    if (!customer.rechargePlan) {
+      customer.rechargePlan = {};
+    }
+
+    if (planName) customer.rechargePlan.planName = planName;
+    if (billingFrequency) customer.rechargePlan.billingFrequency = billingFrequency;
+    if (monthlyAmount !== undefined) customer.rechargePlan.monthlyAmount = Number(monthlyAmount);
+    if (Array.isArray(servicesIncluded)) customer.rechargePlan.servicesIncluded = servicesIncluded;
+
+    // Calculate new expiry date
+    let newExpiry;
+    if (validUntil) {
+      newExpiry = new Date(validUntil);
+    } else {
+      const currentExpiry = customer.rechargePlan.validUntil && new Date(customer.rechargePlan.validUntil) > new Date()
+        ? new Date(customer.rechargePlan.validUntil)
+        : new Date();
+
+      if (months > 0) {
+        currentExpiry.setMonth(currentExpiry.getMonth() + Number(months));
+      } else {
+        currentExpiry.setDate(currentExpiry.getDate() + Number(days));
+      }
+      newExpiry = currentExpiry;
+    }
+
+    customer.rechargePlan.validFrom = new Date();
+    customer.rechargePlan.validUntil = newExpiry;
+
+    // Auto-unlock if previously held
+    if (autoUnlock && customer.accessControl?.isPortalLocked) {
+      customer.accessControl.isPortalLocked = false;
+      customer.accessControl.servicesSuspended = false;
+      customer.accessControl.holdType = "NONE";
+    }
+
+    await customer.save();
+
+    // Broadcast update via WebSockets
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`customer_${customer._id}`).emit("portal_recharge_updated", {
+        customerId: customer._id,
+        rechargePlan: customer.rechargePlan,
+        isPortalLocked: customer.accessControl?.isPortalLocked || false,
+      });
+    }
+
+    // Audit Trail
+    const AuditLog = require("../models/AuditLog");
+    try {
+      await AuditLog.create({
+        actorType: req.user?.role || "Admin",
+        actorId: req.user?._id || null,
+        actorName: req.user?.name || "Admin",
+        action: "CUSTOMER_SERVICE_RECHARGED",
+        entityType: "Customer",
+        entityId: customer._id,
+        details: `Recharged service plan for ${customer.name}. New validity until ${newExpiry.toLocaleDateString("en-IN")}. Notes: ${notes || "Standard renewal"}`,
+      });
+    } catch (e) {}
+
+    return res.status(200).json({
+      success: true,
+      message: `Service plan recharged successfully. Valid until ${newExpiry.toLocaleDateString("en-IN")}.`,
+      data: {
+        customerId: customer._id,
+        rechargePlan: customer.rechargePlan,
+        accessControl: customer.accessControl,
+      },
+    });
+  } catch (error) {
+    console.error("[Recharge Error]:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /api/customers/:id/recharge-status
+ * Returns client recharge countdown, active services, and lock status.
+ */
+exports.getCustomerRechargeStatus = async (req, res) => {
+  try {
+    const customer = await Customer.findById(req.params.id)
+      .select("name companyName rechargePlan accessControl totalPending totalPaid email phone contactNumbers")
+      .lean();
+
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "Customer not found." });
+    }
+
+    const validUntil = customer.rechargePlan?.validUntil ? new Date(customer.rechargePlan.validUntil) : null;
+    let daysRemaining = null;
+    let isExpired = false;
+
+    if (validUntil) {
+      const diffMs = validUntil.getTime() - Date.now();
+      daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      isExpired = daysRemaining <= 0;
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        customerId: customer._id,
+        customerName: customer.name,
+        companyName: customer.companyName,
+        totalPending: customer.totalPending || 0,
+        totalPaid: customer.totalPaid || 0,
+        rechargePlan: {
+          ...customer.rechargePlan,
+          daysRemaining,
+          isExpired,
+        },
+        accessControl: customer.accessControl || {
+          isPortalLocked: false,
+          servicesSuspended: false,
+          holdType: "NONE",
+        },
+      },
+    });
+  } catch (error) {
+    console.error("[Get Recharge Status Error]:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /api/customers/:id/send-recharge-alert
+ * Dispatches an automated warning reminder before or after service expiry.
+ */
+exports.sendRechargeDueAlert = async (req, res) => {
+  try {
+    const { channel = "WhatsApp", customMessage = "" } = req.body;
+    const customer = await Customer.findById(req.params.id);
+    if (!customer) {
+      return res.status(404).json({ success: false, message: "Customer not found." });
+    }
+
+    const pending = Number(customer.totalPending || 0);
+    const validUntilStr = customer.rechargePlan?.validUntil
+      ? new Date(customer.rechargePlan.validUntil).toLocaleDateString("en-IN")
+      : "today";
+
+    const defaultMsg = `Dear ${customer.name},\n\nThis is a priority reminder from Digitalness. Your agency service retainer validity expires on ${validUntilStr}.${pending > 0 ? ` Outstanding balance due: ₹${pending.toLocaleString("en-IN")}.` : ""}\n\nPlease complete your recharge promptly to ensure uninterrupted marketing campaigns, creatives, and client portal access.\n\nThank you,\nFinance & Operations`;
+
+    const messageContent = (customMessage && customMessage.trim()) || defaultMsg;
+
+    const Communication = require("../models/Communication");
+    const alertRecord = await Communication.create({
+      customerId: customer._id,
+      recipientType: "Customer",
+      recipientId: customer._id,
+      recipientName: customer.name,
+      channel,
+      direction: "Outbound",
+      status: "Sent",
+      subject: `Service Retainer & Payment Alert: ${customer.name}`,
+      message: messageContent,
+      content: messageContent,
+      by: req.user?._id || null,
+      byName: req.user?.name || "Finance Admin",
+      metadata: {
+        autoTriggered: false,
+        trigger: "RECHARGE_RENEWAL_ALERT",
+        totalPending: pending,
+        validUntil: customer.rechargePlan?.validUntil || null,
+        recipientPhone: customer.contactNumbers?.[0] || customer.phone || "",
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Recharge alert sent via ${channel} to ${customer.name}.`,
+      data: alertRecord,
+    });
+  } catch (error) {
+    console.error("[Send Recharge Alert Error]:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

@@ -64,6 +64,20 @@ export const AuthProvider = ({ children }) => {
 
       if (!token.startsWith("demo-")) {
         refreshProfile();
+
+        // 1. Refresh when user switches tabs or window gains focus
+        const handleFocus = () => refreshProfile();
+        window.addEventListener("focus", handleFocus);
+
+        // 2. Poll every 20 seconds to instantly detect portal locks/unlocks
+        const pollInterval = setInterval(() => {
+          refreshProfile();
+        }, 20000);
+
+        return () => {
+          window.removeEventListener("focus", handleFocus);
+          clearInterval(pollInterval);
+        };
       }
     }
   }, [token, refreshProfile]);
