@@ -298,17 +298,17 @@ export function FloatingAICopilot() {
         <button
           onClick={() => setIsOpen(!isOpen)}
           aria-label="Open AI Copilot"
-          className="relative group w-14 h-14 rounded-full bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 text-white shadow-2xl flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-indigo-500/50 active:scale-95 focus:outline-hidden focus:ring-4 focus:ring-indigo-400/40"
+          className="relative group w-14 h-14 rounded-full bg-gradient-to-tr from-[#FF1B7A] via-[#7928CA] to-[#00D8F6] text-white shadow-xl shadow-[#FF1B7A]/30 flex items-center justify-center transition-all duration-300 hover:scale-110 hover:shadow-2xl hover:shadow-[#00D8F6]/40 active:scale-95 focus:outline-hidden border border-white/25"
         >
-          {/* Pulsing ring indicator */}
-          <span className="absolute inset-0 rounded-full bg-indigo-500/30 animate-ping opacity-75 pointer-events-none" />
+          {/* Pulsing spectral glow ring */}
+          <span className="absolute inset-0 rounded-full bg-[#FF1B7A]/30 animate-ping opacity-75 pointer-events-none" />
 
           {isOpen ? (
             <X className="w-6 h-6 text-white transition-transform duration-200 group-hover:rotate-90" />
           ) : (
             <div className="relative flex items-center justify-center">
-              <Bot className="w-7 h-7 text-white" />
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 absolute -top-1 -right-1 animate-bounce" />
+              <Bot className="w-6 h-6 text-white" />
+              <Sparkles className="w-3.5 h-3.5 text-yellow-300 absolute -top-1 -right-1 animate-bounce" />
             </div>
           )}
         </button>
@@ -317,26 +317,26 @@ export function FloatingAICopilot() {
       {/* 2. FLOATING COPILOT MODAL / DRAWER PANEL */}
       {isOpen && (
         <div
-          className={`fixed z-50 transition-all duration-300 ease-out flex flex-col bg-slate-950/95 border border-indigo-500/30 shadow-[0_25px_70px_rgba(0,0,0,0.75)] backdrop-blur-2xl ring-1 ring-white/10 overflow-hidden ${isExpanded
+          className={`fixed z-50 transition-all duration-300 ease-out flex flex-col bg-[#080B1E]/95 border border-[#FF1B7A]/30 shadow-[0_25px_70px_rgba(0,0,0,0.85)] backdrop-blur-2xl ring-1 ring-white/10 overflow-hidden ${isExpanded
             ? "inset-4 sm:inset-10 md:inset-16 rounded-3xl"
             : "bottom-24 right-4 sm:right-6 w-[calc(100vw-32px)] sm:w-[440px] md:w-[460px] h-[620px] max-h-[82vh] rounded-2xl"
             }`}
         >
           {/* TOP BAR / HEADER */}
-          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 border-b border-indigo-500/20">
+          <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#0B0E2B] via-[#161D4C] to-[#2E1065] border-b border-[#FF1B7A]/25">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-md border border-indigo-400/30 text-white">
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#FF1B7A] to-[#00D8F6] flex items-center justify-center shadow-md border border-white/20 text-white font-bold">
                 <Bot className="w-4.5 h-4.5" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5">
-                  <h3 className="text-xs font-black tracking-tight text-white">Digitalness Copilot</h3>
+                  <h3 className="text-xs font-heading font-extrabold tracking-tight text-white">Digitalness Copilot</h3>
                   <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[9px] font-bold px-1.5 py-0">
-                    Online
+                    Live Engine
                   </Badge>
                 </div>
-                <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                  <Zap className="w-2.5 h-2.5 text-amber-400" /> Natural Language Agency OS
+                <span className="text-[10px] text-slate-300 font-medium flex items-center gap-1">
+                  <Zap className="w-2.5 h-2.5 text-[#00D8F6]" /> Agency Autonomous Intelligence
                 </span>
               </div>
             </div>

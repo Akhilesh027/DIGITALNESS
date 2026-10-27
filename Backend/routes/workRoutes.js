@@ -17,6 +17,7 @@ const {
   getWorkAnalytics,
   approveWork,
   revisionWork,
+  createMonthlyBatch,
 } = require("../controllers/workController.js");
 
 const { protect } = require("../middleware/authMiddleware.js");
@@ -25,6 +26,9 @@ router.use(protect);
 
 // Analytics
 router.get("/analytics/summary", getWorkAnalytics);
+
+// Monthly automated batch generation
+router.post("/monthly-batch", createMonthlyBatch);
 
 // Create / Get all works
 router.route("/")

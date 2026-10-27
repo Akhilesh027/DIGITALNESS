@@ -333,6 +333,25 @@ const customerSchema = new mongoose.Schema(
         connectedAt: { type: Date, default: null },
       },
     },
+
+    monthlyDeliverablesScope: {
+      monthYear: { type: String, default: "" },
+      postersCount: { type: Number, default: 30 },
+      postersCadence: { type: String, default: "daily" },
+      reelsCount: { type: Number, default: 4 },
+      reelsCadence: { type: String, default: "weekly" },
+      metaAdsEnabled: { type: Boolean, default: false },
+      metaMonthlyBudget: { type: Number, default: 0 },
+      metaCampaignGoals: { type: String, default: "" },
+      googleAdsEnabled: { type: Boolean, default: false },
+      googleMonthlyBudget: { type: Number, default: 0 },
+      googleCampaignGoals: { type: String, default: "" },
+      seoGmbType: { type: String, default: "None" },
+      targetKeywords: { type: String, default: "" },
+      assignedManagerId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      notes: { type: String, default: "" },
+      lastGeneratedAt: { type: Date, default: null },
+    },
   },
   { timestamps: true }
 );

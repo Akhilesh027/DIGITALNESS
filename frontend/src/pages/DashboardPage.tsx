@@ -623,64 +623,72 @@ export default function DashboardPage() {
     });
   }
 
-  const COLORS = ['#00C49F', '#0088FE', '#FFBB28', '#FF8042', '#A855F7', '#EF4444'];
+  const COLORS = ['#FF1B7A', '#7928CA', '#00D8F6', '#10B981', '#F59E0B', '#3B82F6'];
 
   const getStatusColor = (status?: string) => {
     const map: Record<string, string> = {
-      Completed: 'bg-green-100 text-green-800',
-      'In Progress': 'bg-blue-100 text-blue-800',
-      Pending: 'bg-yellow-100 text-yellow-800',
-      Open: 'bg-blue-100 text-blue-800',
-      Closed: 'bg-gray-100 text-gray-800',
-      Resolved: 'bg-green-100 text-green-800',
-      Won: 'bg-green-100 text-green-800',
-      'Own Close': 'bg-green-100 text-green-800',
-      Lost: 'bg-red-100 text-red-800',
-      Failed: 'bg-red-100 text-red-800',
-      Review: 'bg-purple-100 text-purple-800',
+      Completed: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold',
+      'In Progress': 'bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/30 font-semibold',
+      Pending: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 font-semibold',
+      Open: 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border border-indigo-500/30 font-semibold',
+      Closed: 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border border-slate-500/30',
+      Resolved: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold',
+      Won: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold',
+      'Own Close': 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 font-semibold',
+      Lost: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-semibold',
+      Failed: 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 font-semibold',
+      Review: 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/30 font-semibold',
     };
 
-    return map[status || ''] || 'bg-gray-100 text-gray-800';
+    return map[status || ''] || 'bg-slate-500/15 text-slate-600 dark:text-slate-400';
   };
 
   if (loading) {
     return (
-      <div className="p-6 flex justify-center items-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
-          <p className="mt-2">Loading dashboard...</p>
+      <div className="p-12 flex justify-center items-center h-64">
+        <div className="text-center space-y-3">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#FF1B7A] mx-auto" />
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Syncing Agency Telemetry...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 pb-10">
+      {/* Dynamic Executive Cockpit Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        className="relative overflow-hidden rounded-3xl border border-border/80 bg-gradient-to-r from-card via-card to-secondary/30 p-6 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
       >
-        <div>
-          <h1 className="text-2xl font-bold">
-            Dashboard Overview {currentUser.role ? `(${currentUser.role})` : ''}
+        <div className="relative z-10">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+              {currentUser.role || 'Executive'} Cockpit
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-foreground tracking-tight">
+            Dashboard Overview
           </h1>
-          <p className="text-muted-foreground">{dashboardTitle}</p>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 font-medium">{dashboardTitle}</p>
         </div>
 
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="w-4 h-4" />
-          {new Date().toLocaleDateString('en-IN', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-          })}
+        <div className="relative z-10 flex items-center gap-2.5 self-start sm:self-auto px-3.5 py-2 rounded-xl bg-card border border-border/80 shadow-xs text-xs font-medium text-foreground">
+          <Calendar className="w-4 h-4 text-primary shrink-0" />
+          <span>
+            {new Date().toLocaleDateString('en-IN', {
+              weekday: 'short',
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </span>
         </div>
       </motion.div>
 
-      {/* Stats */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {statsCards.map((stat, index) => (
           <StatCard key={stat.title} {...stat} delay={index} />
@@ -690,47 +698,84 @@ export default function DashboardPage() {
       {/* Charts */}
       <div className={`grid grid-cols-1 ${canViewLeads ? 'lg:grid-cols-2' : 'lg:grid-cols-1'} gap-6`}>
         {canViewLeads && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Lead Status Distribution</CardTitle>
+          <Card className="rounded-2xl border-border/80 bg-card/85 backdrop-blur-xl shadow-sm hover:shadow-md transition-all">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-heading font-bold flex items-center justify-between">
+                <span>Lead Distribution Funnel</span>
+                <span className="text-xs font-mono font-medium text-muted-foreground">{leads.length} Total</span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {leadStatusData.length ? (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
-                    <Pie data={leadStatusData} dataKey="value" nameKey="name" outerRadius={80} label>
+                    <Pie
+                      data={leadStatusData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={4}
+                      stroke="none"
+                    >
                       {leadStatusData.map((_, index) => (
                         <Cell key={index} fill={COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: '0.75rem',
+                        backgroundColor: '#0B0E2B',
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        color: '#fff',
+                        fontSize: '12px',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+                      }}
+                    />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-64 flex items-center justify-center text-muted-foreground">No lead data</div>
+                <div className="h-64 flex items-center justify-center text-xs text-muted-foreground font-medium">No lead data available</div>
               )}
             </CardContent>
           </Card>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{isNormalEmployee ? 'My Work Status Overview' : 'Work Status Overview'}</CardTitle>
+        <Card className="rounded-2xl border-border/80 bg-card/85 backdrop-blur-xl shadow-sm hover:shadow-md transition-all">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-heading font-bold flex items-center justify-between">
+              <span>{isNormalEmployee ? 'My Active Workload' : 'Agency Work Status Velocity'}</span>
+              <span className="text-xs font-mono font-medium text-muted-foreground">{works.length} Total</span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {workStatusData.length ? (
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={workStatusData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="#0088FE" />
+                  <defs>
+                    <linearGradient id="workGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#00D8F6" />
+                      <stop offset="100%" stopColor="#7928CA" />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(150,150,150,0.1)" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '0.75rem',
+                      backgroundColor: '#0B0E2B',
+                      borderColor: 'rgba(255,255,255,0.1)',
+                      color: '#fff',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Bar dataKey="value" fill="url(#workGradient)" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-64 flex items-center justify-center text-muted-foreground">No work data</div>
+              <div className="h-64 flex items-center justify-center text-xs text-muted-foreground font-medium">No work data available</div>
             )}
           </CardContent>
         </Card>
@@ -783,93 +828,111 @@ export default function DashboardPage() {
       {/* Info Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {canViewEmployees && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex gap-2">
-                <Star className="text-yellow-500" /> Top Employees
+          <Card className="rounded-2xl border-border/80 bg-card/85 backdrop-blur-xl shadow-sm hover:shadow-md transition-all">
+            <CardHeader className="pb-3 border-b border-border/60">
+              <CardTitle className="text-sm font-heading font-bold flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Star className="w-4 h-4 text-amber-500 fill-amber-500" /> Top Agency Performers
+                </span>
+                <span className="text-[10px] font-mono text-muted-foreground">Efficiency</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-3">
               {topEmployees.length ? (
                 topEmployees.map((employee, index) => (
-                  <div key={index} className="flex justify-between items-center p-2 rounded-lg bg-muted/30 mb-2">
-                    <div className="flex gap-2 items-center">
-                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold">
+                  <div key={index} className="flex justify-between items-center p-2.5 rounded-xl bg-secondary/30 hover:bg-secondary/60 transition-colors mb-2 last:mb-0">
+                    <div className="flex gap-2.5 items-center min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#FF1B7A] to-[#7928CA] flex items-center justify-center text-xs font-bold text-white shrink-0 shadow-xs">
                         {employee.name.charAt(0)}
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">{employee.name}</p>
-                        <p className="text-xs">Completed: {employee.completed}/{employee.total}</p>
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-semibold truncate text-foreground">{employee.name}</p>
+                        <p className="text-[11px] text-muted-foreground truncate font-medium">Completed: {employee.completed}/{employee.total} tasks</p>
                       </div>
                     </div>
-                    <Badge variant="outline">
+                    <Badge variant="outline" className="text-xs font-mono font-semibold px-2 py-0.5 rounded-md border-primary/30 text-primary shrink-0 ml-2">
                       {employee.total ? Math.round((employee.completed / employee.total) * 100) : 0}%
                     </Badge>
                   </div>
                 ))
               ) : (
-                <p className="text-center py-6 text-muted-foreground">No data</p>
+                <p className="text-center py-6 text-xs text-muted-foreground font-medium">No performance data yet</p>
               )}
             </CardContent>
           </Card>
         )}
 
         {canViewLeads && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex gap-2">
-                <Target className="text-blue-500" /> {isTelecaller ? 'My Recent Leads' : 'Recent Leads'}
+          <Card className="rounded-2xl border-border/80 bg-card/85 backdrop-blur-xl shadow-sm hover:shadow-md transition-all">
+            <CardHeader className="pb-3 border-b border-border/60">
+              <CardTitle className="text-sm font-heading font-bold flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-[#FF1B7A]" /> {isTelecaller ? 'My Pipeline Inflow' : 'Recent Leads'}
+                </span>
+                <span className="text-[10px] font-mono text-muted-foreground">Latest Deals</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-3">
               {recentLeads.length ? (
                 recentLeads.map((lead) => (
-                  <div key={lead._id} className="flex justify-between items-center p-2 rounded-lg bg-muted/30 mb-2">
-                    <div>
-                      <p className="text-sm font-medium">{lead.name}</p>
-                      <p className="text-xs text-muted-foreground">{formatRelativeTime(lead.createdAt)}</p>
+                  <div key={lead._id} className="flex justify-between items-center p-2.5 rounded-xl bg-secondary/30 hover:bg-secondary/60 transition-colors mb-2 last:mb-0">
+                    <div className="min-w-0 pr-2">
+                      <p className="text-xs sm:text-sm font-semibold truncate text-foreground">{lead.name}</p>
+                      <p className="text-[11px] text-muted-foreground truncate font-medium">{formatRelativeTime(lead.createdAt)}</p>
                     </div>
-                    <Badge className={getStatusColor(lead.status)}>{lead.status}</Badge>
+                    <Badge className={`text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 ${getStatusColor(lead.status)}`}>
+                      {lead.status}
+                    </Badge>
                   </div>
                 ))
               ) : (
-                <p className="text-center py-6 text-muted-foreground">No leads</p>
+                <p className="text-center py-6 text-xs text-muted-foreground font-medium">No recent leads found</p>
               )}
             </CardContent>
           </Card>
         )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex gap-2">
-              <Briefcase className="text-green-500" /> {isNormalEmployee ? 'My Urgent Works' : 'Urgent Works'}
+        <Card className="rounded-2xl border-border/80 bg-card/85 backdrop-blur-xl shadow-sm hover:shadow-md transition-all">
+          <CardHeader className="pb-3 border-b border-border/60">
+            <CardTitle className="text-sm font-heading font-bold flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-[#00D8F6]" /> {isNormalEmployee ? 'My Urgent Deliverables' : 'Urgent Work Deliverables'}
+              </span>
+              <span className="text-[10px] font-mono text-rose-500 font-semibold">Priority</span>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-3">
             {urgentWorks.length ? (
               urgentWorks.map((work) => (
-                <div key={work._id} className="flex justify-between items-center p-2 rounded-lg bg-muted/30 mb-2">
-                  <div>
-                    <p className="text-sm font-medium">{work.title}</p>
-                    <p className="text-xs text-muted-foreground">{work.dueDate ? new Date(work.dueDate).toLocaleDateString('en-IN') : 'No due date'}</p>
+                <div key={work._id} className="flex justify-between items-center p-2.5 rounded-xl bg-secondary/30 hover:bg-secondary/60 transition-colors mb-2 last:mb-0">
+                  <div className="min-w-0 pr-2">
+                    <p className="text-xs sm:text-sm font-semibold truncate text-foreground">{work.title}</p>
+                    <p className="text-[11px] text-muted-foreground truncate font-medium">
+                      {work.dueDate ? `Due: ${new Date(work.dueDate).toLocaleDateString('en-IN')}` : 'No deadline'}
+                    </p>
                   </div>
-                  <Badge className={getStatusColor(work.status)}>{work.priority || work.status}</Badge>
+                  <Badge className={`text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 ${getStatusColor(work.status)}`}>
+                    {work.priority || work.status}
+                  </Badge>
                 </div>
               ))
             ) : (
-              <p className="text-center py-6 text-muted-foreground">No urgent works</p>
+              <p className="text-center py-6 text-xs text-muted-foreground font-medium">All high-priority deliverables completed</p>
             )}
           </CardContent>
         </Card>
 
         {canViewTickets && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex gap-2">
-                <Ticket className="text-purple-500" /> {isTelecaller ? 'My Recent Tickets' : 'Recent Tickets'}
+          <Card className="rounded-2xl border-border/80 bg-card/85 backdrop-blur-xl shadow-sm hover:shadow-md transition-all">
+            <CardHeader className="pb-3 border-b border-border/60">
+              <CardTitle className="text-sm font-heading font-bold flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Ticket className="w-4 h-4 text-purple-500" /> {isTelecaller ? 'My Support Tickets' : 'Live Client Tickets'}
+                </span>
+                <span className="text-[10px] font-mono text-muted-foreground">Support Desk</span>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-3">
               {recentTickets.length ? (
                 recentTickets.map((ticket) => (
                   <div key={ticket._id} className="flex justify-between items-center p-2 rounded-lg bg-muted/30 mb-2">

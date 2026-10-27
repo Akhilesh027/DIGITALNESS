@@ -814,7 +814,12 @@ export default function CustomersPage() {
             <Download className="w-3.5 h-3.5 mr-1.5" />
             <span>Report</span>
           </Button>
-          <Button variant="gradient" size="sm" onClick={openAddCustomer} disabled={pageLoading} className="w-full sm:w-auto h-9 font-medium">
+          <Button
+            size="sm"
+            onClick={openAddCustomer}
+            disabled={pageLoading}
+            className="w-full sm:w-auto h-9 font-semibold rounded-xl bg-gradient-to-r from-[#FF1B7A] via-[#7928CA] to-[#00D8F6] hover:opacity-90 text-white shadow-md shadow-[#FF1B7A]/25 transition-all"
+          >
             {pageLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Plus className="w-3.5 h-3.5 mr-1.5" />}
             <span>Add Customer</span>
           </Button>
@@ -830,84 +835,187 @@ export default function CustomersPage() {
       </div>
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="relative w-full sm:max-w-md md:max-w-xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search customer, PAN, GST, branch, tasks, employees..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} disabled={pageLoading} className="pl-10 text-sm h-9 sm:h-10" />
+        <div className="relative w-full sm:max-w-md md:max-w-xl group">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <Input
+            placeholder="Search customer, PAN, GST, branch, tasks, employees..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            disabled={pageLoading}
+            className="pl-10 h-10 rounded-xl bg-card border-border/80 focus:border-primary text-xs sm:text-sm shadow-sm"
+          />
         </div>
-        <div className="rounded-lg border border-border bg-card px-3.5 py-1.5 text-xs sm:text-sm text-muted-foreground self-start sm:self-auto shrink-0">
-          Showing <span className="font-semibold text-foreground">{filteredCustomers.length}</span> customers
+        <div className="rounded-xl border border-border/80 bg-card/80 backdrop-blur-md px-3.5 py-2 text-xs sm:text-sm text-muted-foreground self-start sm:self-auto shrink-0 shadow-sm">
+          Showing <span className="font-bold text-foreground">{filteredCustomers.length}</span> accounts
         </div>
       </div>
 
       {pageLoading ? <CustomersLoadingSkeleton /> : filteredCustomers.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-muted-foreground">No customers found</div>
+        <div className="rounded-2xl border border-dashed border-border bg-card/60 p-12 text-center text-muted-foreground">
+          <Building2 className="w-8 h-8 mx-auto mb-2 opacity-40 text-primary" />
+          <p className="font-semibold text-foreground">No customers found</p>
+          <p className="text-xs text-muted-foreground mt-1">Try refining your search query or add a new customer.</p>
+        </div>
       ) : (
-        <motion.div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4">
+        <motion.div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {filteredCustomers.map((customer, index) => {
             const customerWorks = getCustomerWorks(customer._id);
             const hasClientLogin = Boolean(customer.userId);
             const primaryPhone = customer.contactNumbers?.[0] || "—";
             const docsCount = (customer.supportingDocuments || customer.documents || []).length;
             return (
-              <motion.div key={customer._id} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.03 }} className="bg-card rounded-2xl border border-border shadow-card p-4 sm:p-5 hover:shadow-card-hover transition-all group flex flex-col justify-between">
+              <motion.div
+                key={customer._id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(index * 0.02, 0.3) }}
+                className="relative bg-card/90 backdrop-blur-xl rounded-2xl border border-border/80 p-5 shadow-sm hover:shadow-xl hover:border-[#00D8F6]/40 transition-all duration-200 group flex flex-col justify-between"
+              >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-3.5">
                     {customer.brandProfile?.logoUrl ? (
-                      <img src={customer.brandProfile.logoUrl} alt={customer.name} className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-lg object-contain border border-border bg-white p-1" />
+                      <img
+                        src={customer.brandProfile.logoUrl}
+                        alt={customer.name}
+                        className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-xl object-contain border border-border bg-white p-1 shadow-sm"
+                      />
                     ) : (
-                      <div className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold text-base sm:text-lg">{customer.name?.charAt(0)?.toUpperCase() || "C"}</div>
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 shrink-0 rounded-2xl bg-gradient-to-tr from-[#FF1B7A] via-[#7928CA] to-[#00D8F6] flex items-center justify-center text-white font-heading font-extrabold text-base sm:text-lg shadow-md shadow-[#FF1B7A]/20">
+                        {customer.name?.charAt(0)?.toUpperCase() || "C"}
+                      </div>
                     )}
-                    <div className="min-w-0 flex-1"><h3 className="font-semibold text-foreground truncate text-sm sm:text-base">{customer.name}</h3><p className="text-xs sm:text-sm text-muted-foreground truncate">{customer.companyName || customer.businessType || "Business"}</p></div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-heading font-bold text-foreground truncate text-sm sm:text-base group-hover:text-primary transition-colors">
+                        {customer.name}
+                      </h3>
+                      <p className="text-xs text-muted-foreground truncate font-medium">
+                        {customer.companyName || customer.businessType || "Business Account"}
+                      </p>
+                    </div>
                     <div className="flex gap-1 shrink-0">
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => openEditCustomer(customer)}><Edit3 className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setSelectedCustomer(customer)}><Eye className="w-4 h-4" /></Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"
+                        onClick={() => openEditCustomer(customer)}
+                        title="Edit Customer"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"
+                        onClick={() => setSelectedCustomer(customer)}
+                        title="View 360° Profile"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
 
-                  <div className="space-y-1.5 mb-3.5 cursor-pointer" onClick={() => setSelectedCustomer(customer)}>
-                    <InfoRow icon={<Phone className="w-3.5 h-3.5" />} text={primaryPhone} />
-                    <InfoRow icon={<Mail className="w-3.5 h-3.5" />} text={customer.email || "No email"} />
-                    <InfoRow icon={<MapPin className="w-3.5 h-3.5" />} text={[customer.city, customer.state].filter(Boolean).join(", ") || "—"} />
-                    <InfoRow icon={<Building2 className="w-3.5 h-3.5" />} text={branchName(customer.branchId || customer.branch)} />
-                    <InfoRow icon={<User className="w-3.5 h-3.5" />} text={getAssignedName(customer.assignedTo)} />
-                    <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                      <Badge variant={customer.status === "Inactive" ? "destructive" : "default"} className="text-[11px] px-2 py-0.5">{customer.status || "Active"}</Badge>
+                  <div className="space-y-1.5 mb-3.5 cursor-pointer rounded-xl p-2.5 bg-secondary/30 hover:bg-secondary/60 transition-colors" onClick={() => setSelectedCustomer(customer)}>
+                    <InfoRow icon={<Phone className="w-3.5 h-3.5 text-slate-400" />} text={primaryPhone} />
+                    <InfoRow icon={<Mail className="w-3.5 h-3.5 text-slate-400" />} text={customer.email || "No email"} />
+                    <InfoRow icon={<MapPin className="w-3.5 h-3.5 text-slate-400" />} text={[customer.city, customer.state].filter(Boolean).join(", ") || "—"} />
+                    <InfoRow icon={<Building2 className="w-3.5 h-3.5 text-slate-400" />} text={branchName(customer.branchId || customer.branch)} />
+                    <InfoRow icon={<User className="w-3.5 h-3.5 text-slate-400" />} text={getAssignedName(customer.assignedTo)} />
+                    <div className="flex flex-wrap items-center gap-1.5 pt-2">
+                      <Badge
+                        variant={customer.status === "Inactive" ? "destructive" : "default"}
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+                          customer.status === "Inactive"
+                            ? "bg-rose-500/15 text-rose-600 border-rose-500/30"
+                            : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                        }`}
+                      >
+                        {customer.status || "Active"}
+                      </Badge>
                       {customer.accessControl?.isPortalLocked && (
-                        <Badge variant="destructive" className="bg-rose-600 text-white font-bold animate-pulse text-[11px] px-2 py-0.5">
+                        <Badge variant="destructive" className="bg-rose-600 text-white font-bold animate-pulse text-[10px] px-2 py-0.5 rounded-md">
                           <Lock className="w-3 h-3 mr-1" /> Portal Held
                         </Badge>
                       )}
                       {customer.rechargePlan?.validUntil && (
-                        <Badge variant="outline" className="text-primary border-primary/40 font-mono text-[10px] px-2 py-0.5">
+                        <Badge variant="outline" className="text-primary border-primary/40 font-mono text-[10px] px-2 py-0.5 rounded-md">
                           📅 {new Date(customer.rechargePlan.validUntil) < new Date() ? "Expired" : "Active Plan"}
                         </Badge>
                       )}
-                      <Badge variant="secondary" className="text-[11px] px-2 py-0.5">{customerWorks.length} Works</Badge>
-                      <Badge variant="outline" className="text-[11px] px-2 py-0.5">{docsCount} Docs</Badge>
-                      <Badge variant={hasClientLogin ? "default" : "outline"} className="text-[11px] px-2 py-0.5">{hasClientLogin ? "Login Active" : "No Login"}</Badge>
+                      <Badge variant="secondary" className="text-[10px] font-medium px-2 py-0.5 rounded-md">{customerWorks.length} Works</Badge>
+                      <Badge variant="outline" className="text-[10px] font-medium px-2 py-0.5 rounded-md">{docsCount} Docs</Badge>
+                      <Badge
+                        variant="outline"
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${
+                          hasClientLogin
+                            ? "bg-sky-500/10 text-sky-600 border-sky-500/30 font-semibold"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {hasClientLogin ? "Login Active" : "No Login"}
+                      </Badge>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-border space-y-2">
-                  {customerWorks.slice(0, 2).map((work) => <div key={work._id} className="rounded-lg bg-muted/40 p-2"><p className="text-xs sm:text-sm font-medium line-clamp-1">{work.title}</p><p className="text-[11px] text-muted-foreground truncate">{work.workType || work.type || "General"} • {work.status || "Pending"}</p></div>)}
-                  {customerWorks.length > 2 && <p className="text-[11px] text-muted-foreground">+{customerWorks.length - 2} more works</p>}
-                  {customerWorks.length === 0 && <p className="text-[11px] text-muted-foreground">No work history found</p>}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 pt-1.5">
-                    <Button variant="outline" size="sm" onClick={() => window.location.href = `/customers/${customer._id}/onboarding`} className="text-indigo-600 border-indigo-200 text-xs px-2 h-8">
-                      <Sparkles className="w-3.5 h-3.5 mr-1 text-indigo-600 shrink-0" /> <span className="truncate">Onboard</span>
+                <div className="pt-3 border-t border-border/80 space-y-2">
+                  {customerWorks.slice(0, 2).map((work) => (
+                    <div key={work._id} className="rounded-xl bg-secondary/40 p-2.5 border border-border/50">
+                      <p className="text-xs sm:text-sm font-semibold text-foreground line-clamp-1">{work.title}</p>
+                      <p className="text-[11px] text-muted-foreground truncate mt-0.5 font-medium">
+                        {work.workType || work.type || "General"} • {work.status || "Pending"}
+                      </p>
+                    </div>
+                  ))}
+                  {customerWorks.length > 2 && (
+                    <p className="text-[11px] text-muted-foreground font-medium px-1">
+                      +{customerWorks.length - 2} more works
+                    </p>
+                  )}
+                  {customerWorks.length === 0 && (
+                    <p className="text-[11px] text-muted-foreground font-medium px-1">No active work orders</p>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.location.href = `/customers/${customer._id}/onboarding`}
+                      className="text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/50 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 text-xs px-2 h-8 rounded-lg font-medium"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 mr-1 text-indigo-500 shrink-0" />
+                      <span className="truncate">Onboard</span>
                     </Button>
                     <Button
                       variant={customer.accessControl?.isPortalLocked ? "destructive" : "outline"}
                       size="sm"
                       onClick={() => setRechargeCustomer(customer)}
-                      className={`text-xs px-2 h-8 ${customer.accessControl?.isPortalLocked ? "bg-rose-600 text-white font-bold" : "text-emerald-700 border-emerald-300 font-semibold"}`}
+                      className={`text-xs px-2 h-8 rounded-lg font-semibold ${
+                        customer.accessControl?.isPortalLocked
+                          ? "bg-rose-600 text-white font-bold"
+                          : "text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                      }`}
                     >
                       <CreditCard className="w-3.5 h-3.5 mr-1 shrink-0" />
                       <span className="truncate">{customer.accessControl?.isPortalLocked ? "Hold / Unlock" : "Recharge"}</span>
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => openClientLogin(customer)} className="text-xs px-2 h-8"><KeyRound className="w-3.5 h-3.5 mr-1 shrink-0" /><span className="truncate">Login</span></Button>
-                    <Button variant="outline" size="sm" onClick={() => openEditCustomer(customer)} className="text-xs px-2 h-8"><Edit3 className="w-3.5 h-3.5 mr-1 shrink-0" /><span className="truncate">Edit</span></Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openClientLogin(customer)}
+                      className="text-xs px-2 h-8 rounded-lg font-medium hover:bg-secondary"
+                    >
+                      <KeyRound className="w-3.5 h-3.5 mr-1 shrink-0 text-slate-500" />
+                      <span className="truncate">Login</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditCustomer(customer)}
+                      className="text-xs px-2 h-8 rounded-lg font-medium hover:bg-secondary"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 mr-1 shrink-0 text-slate-500" />
+                      <span className="truncate">Edit</span>
+                    </Button>
                   </div>
                 </div>
               </motion.div>
@@ -1281,14 +1389,41 @@ function CustomerProfileDialog({ customer, onClose, onEdit, formatCurrency, bran
 }
 
 function StatCard({ title, value, icon, highlight }: { title: string; value: string | number; icon?: React.ReactNode; highlight?: boolean }) {
+  if (highlight) {
+    return (
+      <div className="relative overflow-hidden p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#0B0E2B] via-[#161D4C] to-[#2E1065] text-white border border-[#FF1B7A]/30 shadow-lg shadow-[#FF1B7A]/10 group transition-all hover:scale-[1.02]">
+        <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-gradient-to-br from-[#FF1B7A]/20 to-[#00D8F6]/20 rounded-full blur-xl pointer-events-none" />
+        <div className="flex items-center justify-between gap-2 relative z-10">
+          <div className="min-w-0">
+            <p className="text-xs sm:text-sm font-medium text-slate-300 tracking-wide">{title}</p>
+            <p className="text-xl sm:text-2xl md:text-3xl font-heading font-extrabold tracking-tight mt-1 text-white truncate">
+              {value}
+            </p>
+          </div>
+          {icon && (
+            <div className="h-10 w-10 shrink-0 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center text-[#00D8F6] border border-white/15">
+              {icon}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={highlight ? "p-3 sm:p-4 md:p-5 rounded-2xl gradient-primary text-primary-foreground shadow-card" : "p-3 sm:p-4 md:p-5 rounded-2xl bg-card border border-border shadow-card"}>
+    <div className="relative overflow-hidden p-4 sm:p-5 rounded-2xl bg-card/80 backdrop-blur-md border border-border/80 shadow-sm hover:shadow-md transition-all group hover:scale-[1.01]">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-lg sm:text-2xl md:text-3xl font-heading font-bold truncate">{value}</p>
-          <p className={highlight ? "text-xs sm:text-sm text-primary-foreground/80 truncate" : "text-xs sm:text-sm text-muted-foreground truncate"}>{title}</p>
+          <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
+          <p className="text-xl sm:text-2xl md:text-3xl font-heading font-bold tracking-tight mt-1 text-foreground truncate">
+            {value}
+          </p>
         </div>
-        {icon && <div className={highlight ? "text-primary-foreground/80 shrink-0" : "text-muted-foreground shrink-0"}>{icon}</div>}
+        {icon && (
+          <div className="h-10 w-10 shrink-0 rounded-xl bg-secondary/80 flex items-center justify-center text-primary border border-border/60">
+            {icon}
+          </div>
+        )}
       </div>
     </div>
   );

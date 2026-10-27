@@ -444,6 +444,7 @@ exports.updateCustomer = async (req, res) => {
       "seoProfile",
       "leadPreferences",
       "reportingPreferences",
+      "monthlyDeliverablesScope",
     ];
 
     profileKeys.forEach((key) => {

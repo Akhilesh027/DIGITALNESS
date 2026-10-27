@@ -271,6 +271,18 @@ const workSchema = new mongoose.Schema(
       default: false,
     },
 
+    channel: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    monthYear: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
     agentId: {
       type: String,
       default: "",

@@ -1335,3 +1335,121 @@ exports.revisionWork = async (req, res) => {
     });
   }
 };
+
+exports.createMonthlyBatch = async (req, res) => {
+  try {
+    const userId = getUserId(req.user);
+    const { customerId, monthYear, monthName, masterWork, tasks = [], scope } = req.body;
+
+    const finalCustomer = cleanObjectId(customerId);
+    if (!finalCustomer) {
+      return res.status(400).json({ success: false, message: "Customer ID is required" });
+    }
+
+    const customerExists = await Customer.findById(finalCustomer);
+    if (!customerExists) {
+      return res.status(404).json({ success: false, message: "Customer not found" });
+    }
+
+    const assignedTo = toArray(masterWork?.assignedTo || customerExists.assignedTo || customerExists.assignedManager || userId).filter(Boolean);
+
+    // 1. Remove previous auto-generated works or retainer placeholders for this customer to prevent duplicates
+    const oldWorks = await Work.find({
+      customer: finalCustomer,
+      $or: [
+        { monthYear: monthYear || "___none___" },
+        { title: new RegExp("Monthly Retainer Execution", "i") },
+      ],
+    }).select("_id");
+
+    const oldIds = oldWorks.map((w) => w._id);
+    if (oldIds.length > 0) {
+      await Work.deleteMany({ _id: { $in: oldIds } });
+      await Customer.findByIdAndUpdate(finalCustomer, {
+        $pull: { works: { work: { $in: oldIds } } },
+      });
+    }
+
+    // 2. Directly insert all individual scheduled deliverable tasks as first-class works
+    const individualTasksPayload = tasks.map((t) => ({
+      title: t.title,
+      parentWorkId: null, // First-class independent task
+      workType: t.workType || "Social Media & Creatives",
+      customer: finalCustomer,
+      assignedTo: toArray(t.assignedTo || assignedTo).filter(Boolean),
+      priority: t.priority || "Medium",
+      dueDate: t.dueDate,
+      description: t.description || "",
+      deliverables: 1,
+      completedDeliverables: 0,
+      slaDays: 2,
+      createdBy: userId,
+      status: "Pending",
+      channel: t.category || t.channel || "",
+      monthYear: monthYear || "",
+      timeline: [
+        {
+          title: "Deliverable Scheduled",
+          description: `${t.title} scheduled for delivery in ${monthName || monthYear}`,
+          createdBy: userId,
+        },
+      ],
+    }));
+
+    const createdTasks = await Work.insertMany(individualTasksPayload);
+
+    // 3. Update Customer record with the generated individual tasks and scope
+    const worksToPush = createdTasks.map((cw) => ({
+      work: cw._id,
+      title: cw.title,
+      workType: cw.workType,
+      assignedTo: cw.assignedTo,
+      status: cw.status,
+      priority: cw.priority,
+      dueDate: cw.dueDate,
+    }));
+
+    const customerUpdatePayload = {
+      $push: { works: { $each: worksToPush } },
+    };
+
+    if (scope) {
+      customerUpdatePayload.$set = {
+        monthlyDeliverablesScope: {
+          monthYear: monthYear || "",
+          postersCount: Number(scope.posters?.count || 30),
+          postersCadence: scope.posters?.cadence || "daily",
+          reelsCount: Number(scope.reels?.count || 4),
+          reelsCadence: scope.reels?.cadence || "weekly",
+          metaAdsEnabled: Boolean(scope.metaAds?.enabled),
+          metaMonthlyBudget: Number(scope.metaAds?.monthlyBudget || 0),
+          metaCampaignGoals: scope.metaAds?.campaignGoals || "",
+          googleAdsEnabled: Boolean(scope.googleAds?.enabled),
+          googleMonthlyBudget: Number(scope.googleAds?.monthlyBudget || 0),
+          googleCampaignGoals: scope.googleAds?.campaignGoals || "",
+          seoGmbType: scope.seoGmb?.type || "None",
+          targetKeywords: scope.seoGmb?.targetKeywords || "",
+          assignedManagerId: scope.assignedManagerId || assignedTo[0],
+          notes: scope.notes || "",
+          lastGeneratedAt: new Date(),
+        },
+      };
+    }
+
+    await Customer.findByIdAndUpdate(finalCustomer, customerUpdatePayload);
+
+    return res.status(201).json({
+      success: true,
+      message: `Successfully generated ${createdTasks.length} monthly deliverables for ${monthName || monthYear}`,
+      tasks: createdTasks,
+      tasksCount: createdTasks.length,
+    });
+  } catch (error) {
+    console.error("Create monthly batch error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate monthly batch tasks",
+      error: error.message,
+    });
+  }
+};

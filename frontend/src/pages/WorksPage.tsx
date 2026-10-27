@@ -1504,19 +1504,39 @@ export default function WorksPage() {
     </>
   );
 
-  const StatCard = ({ title, value, icon: Icon, className }: any) => (
-    <div
-      className={`p-4 rounded-xl border shadow-card bg-card ${className || ""}`}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-2xl font-heading font-bold">{value}</p>
-          <p className="text-sm text-muted-foreground">{title}</p>
+  const StatCard = ({ title, value, icon: Icon, className }: any) => {
+    const isHero = title === "Total Works";
+    if (isHero) {
+      return (
+        <div className="relative overflow-hidden p-4 rounded-2xl bg-gradient-to-br from-[#0B0E2B] via-[#161D4C] to-[#2E1065] text-white border border-[#FF1B7A]/30 shadow-md shadow-[#FF1B7A]/10 group transition-all hover:scale-[1.02]">
+          <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-[#FF1B7A]/20 rounded-full blur-xl pointer-events-none" />
+          <div className="flex items-center justify-between gap-3 relative z-10">
+            <div>
+              <p className="text-2xl font-heading font-extrabold text-white">{value}</p>
+              <p className="text-xs text-slate-300 font-semibold uppercase tracking-wider">{title}</p>
+            </div>
+            <div className="h-9 w-9 rounded-xl bg-white/10 flex items-center justify-center text-[#00D8F6] border border-white/15">
+              <Icon className="w-4 h-4" />
+            </div>
+          </div>
         </div>
-        <Icon className="w-5 h-5 text-muted-foreground" />
+      );
+    }
+
+    return (
+      <div className={`p-4 rounded-2xl border border-border/80 shadow-xs bg-card/85 backdrop-blur-xl hover:shadow-md transition-all ${className || ""}`}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-2xl font-heading font-bold text-foreground">{value}</p>
+            <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">{title}</p>
+          </div>
+          <div className="h-9 w-9 rounded-xl bg-secondary/80 flex items-center justify-center text-muted-foreground border border-border/50">
+            <Icon className="w-4 h-4" />
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderProgress = (project: any) => (
     <div>
@@ -1602,28 +1622,32 @@ export default function WorksPage() {
         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
       >
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">
-            Works & Tasks
+          <div className="flex items-center gap-2 mb-1">
+            <span className="h-2 w-2 rounded-full bg-[#00D8F6] animate-pulse" />
+            <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+              Production Floor
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-foreground tracking-tight">
+            Works & Deliverables
           </h1>
-          <p className="text-muted-foreground">
-            Manage work assignments, subtasks, reviews, comments and customer
-            progress
+          <p className="text-xs sm:text-sm text-muted-foreground font-medium">
+            Manage work assignments, subtasks, asset reviews, and customer milestone progress.
           </p>
         </div>
 
         {canAddWork && (
           <Button
-            variant="gradient"
             onClick={() => setShowAddModal(true)}
             disabled={loading}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto h-10 px-4 rounded-xl bg-gradient-to-r from-[#FF1B7A] via-[#7928CA] to-[#00D8F6] hover:opacity-90 text-white font-semibold shadow-md shadow-[#FF1B7A]/20 transition-all text-xs sm:text-sm"
           >
             {loading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : (
               <Plus className="w-4 h-4 mr-2" />
             )}
-            Create Work
+            <span>Create New Work</span>
           </Button>
         )}
       </motion.div>

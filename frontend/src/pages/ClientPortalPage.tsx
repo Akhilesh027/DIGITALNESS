@@ -5,6 +5,7 @@ import {
   BarChart3,
   Bell,
   Calendar,
+  CalendarCheck2,
   CheckCircle,
   CheckCircle2,
   Clock,
@@ -71,6 +72,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useInvoiceStore } from "@/store/invoiceStore";
+import MonthlyPlannerSection from "@/components/client-portal/MonthlyPlannerSection";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 
@@ -84,6 +86,7 @@ const COLORS = [
 
 type Section =
   | "overview"
+  | "monthly-planner"
   | "proposals"
   | "pending"
   | "invoices"
@@ -95,6 +98,7 @@ type Section =
 
 const NAV: { key: Section; label: string; icon: any }[] = [
   { key: "overview", label: "Overview", icon: LayoutDashboard },
+  { key: "monthly-planner", label: "Monthly Planner", icon: CalendarCheck2 },
   { key: "proposals", label: "Proposals", icon: FileText },
   { key: "pending", label: "Pending Dues", icon: Clock },
   { key: "invoices", label: "Invoices", icon: Receipt },
@@ -1150,7 +1154,11 @@ export default function ClientPortalPage() {
 
   const customerWorks = useMemo(() => {
     return works
-      .filter((work) => String(getWorkCustomerId(work)) === String(selectedCustomerId))
+      .filter((work) => {
+        const matchesCustomer = String(getWorkCustomerId(work)) === String(selectedCustomerId);
+        const isLegacyMaster = work.title?.toLowerCase().includes("monthly retainer execution");
+        return matchesCustomer && !isLegacyMaster;
+      })
       .map((work) => {
         const deliverables = Number(work.deliverables || 1);
         const completedDeliverables = Number(work.completedDeliverables || 0);
@@ -1549,19 +1557,24 @@ export default function ClientPortalPage() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-3xl border bg-card p-5 shadow-sm lg:p-6"
+          className="relative overflow-hidden rounded-3xl border border-border/80 bg-card/90 backdrop-blur-xl p-5 shadow-md lg:p-7"
         >
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          {/* Subtle Ambient Brand Glow */}
+          <div className="absolute top-0 right-0 w-80 h-40 bg-gradient-to-bl from-[#FF1B7A]/10 via-[#00D8F6]/10 to-transparent rounded-full blur-2xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-primary" />
-                <p className="text-sm font-medium text-primary">Client Portal</p>
+              <div className="flex items-center gap-2.5">
+                <div className="h-6 w-auto flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/25 text-primary text-[11px] font-semibold">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-[#00D8F6] animate-pulse" />
+                  <span>Digitalness Verified Client Portal</span>
+                </div>
               </div>
-              <h1 className="mt-2 text-2xl font-bold text-foreground lg:text-3xl">
-                {getCustomerName(customer)} Dashboard
+              <h1 className="mt-2 text-2xl font-heading font-extrabold text-foreground lg:text-3xl tracking-tight">
+                {getCustomerName(customer)} <span className="text-muted-foreground font-normal">Dashboard</span>
               </h1>
-              <p className="mt-1 text-muted-foreground">
-                Track projects, team, reports, invoices, payments and downloads in one place.
+              <p className="mt-1 text-xs sm:text-sm text-muted-foreground font-medium">
+                Real-time deliverables, project telemetry, billing, and direct agency communication.
               </p>
             </div>
 
@@ -1685,7 +1698,48 @@ export default function ClientPortalPage() {
                 )}
               </div>
             </div>
+
+            {/* Active Client Monthly Retainer & Deliverables Banner */}
+            <div className="xl:col-span-2 rounded-3xl border bg-gradient-to-r from-card via-card to-primary/5 p-5 shadow-sm space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-primary/10 text-primary">
+                    <CalendarCheck2 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-foreground text-base flex items-center gap-2">
+                      Active Client Monthly Planner & Execution Engine
+                      <Badge variant="outline" className="text-[10px] font-mono">1-Mo Automated Schedule</Badge>
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Track this month's automated poster cadence (30 daily / 15 alternate), reels (1/wk), paid ad reviews, and live deliverables reconciliation.
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={() => setActive("monthly-planner")}
+                  className="gap-1.5 text-xs font-bold h-9 bg-primary text-primary-foreground shadow-sm"
+                >
+                  <span>Open Monthly Planner</span>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
           </div>
+        )}
+
+        {active === "monthly-planner" && (
+          <MonthlyPlannerSection
+            customer={customer}
+            works={works}
+            employees={employees}
+            isClientUser={isClientUser}
+            onRefresh={fetchBackendData}
+            apiUrl={API_URL}
+            authConfig={getAuthConfig()}
+          />
         )}
 
         {active === "team" && (

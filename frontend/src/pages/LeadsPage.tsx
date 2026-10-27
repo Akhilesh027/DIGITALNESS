@@ -727,131 +727,199 @@ export default function LeadsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+      >
         <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Leads Management</h1>
-          <p className="text-muted-foreground">Track and manage your sales pipeline</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="h-2 w-2 rounded-full bg-[#FF1B7A] animate-pulse" />
+            <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+              Growth Engine
+            </span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-heading font-extrabold text-foreground tracking-tight">
+            Leads & Deal Inflow
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground font-medium">Track, assign, and convert prospects into high-retention agency accounts.</p>
         </div>
         {canAddLead && (
-          <Button variant="gradient" onClick={() => { setNewLead((prev) => ({ ...prev, branchId: prev.branchId || getDefaultBranchId() })); setShowAddModal(true); }} disabled={loading}>
+          <Button
+            onClick={() => {
+              setNewLead((prev) => ({ ...prev, branchId: prev.branchId || getDefaultBranchId() }));
+              setShowAddModal(true);
+            }}
+            disabled={loading}
+            className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#FF1B7A] via-[#7928CA] to-[#00D8F6] hover:opacity-90 text-white font-semibold shadow-md shadow-[#FF1B7A]/20 transition-all text-xs sm:text-sm"
+          >
             {loading ? <LoadingSpinner className="w-4 h-4 mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
-            Add Lead
+            <span>Add New Lead</span>
           </Button>
         )}
       </motion.div>
 
       {/* Stats Cards */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-        className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="p-4 rounded-xl bg-card border border-border shadow-card">
-          <p className="text-2xl font-heading font-bold text-foreground">{leadCounts.total}</p>
-          <p className="text-sm text-muted-foreground">Total Leads</p>
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="grid grid-cols-2 md:grid-cols-5 gap-3.5 sm:gap-4"
+      >
+        {/* Total Leads Hero Tile */}
+        <div className="relative overflow-hidden p-4 rounded-2xl bg-gradient-to-br from-[#0B0E2B] via-[#161D4C] to-[#2E1065] text-white border border-[#FF1B7A]/30 shadow-md shadow-[#FF1B7A]/10 group transition-all hover:scale-[1.02]">
+          <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-[#FF1B7A]/20 rounded-full blur-xl pointer-events-none" />
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">Total Pipeline</p>
+          <p className="text-2xl sm:text-3xl font-heading font-extrabold text-white mt-1">{leadCounts.total}</p>
         </div>
-        <div className="p-4 rounded-xl bg-accent/10 border border-accent/30">
-          <p className="text-2xl font-heading font-bold text-accent">{leadCounts.new}</p>
-          <p className="text-sm text-muted-foreground">New</p>
+
+        {/* New Leads */}
+        <div className="p-4 rounded-2xl bg-card/85 backdrop-blur-xl border border-sky-500/25 shadow-xs hover:border-sky-500/50 transition-all">
+          <p className="text-xs font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400">New Leads</p>
+          <p className="text-2xl sm:text-3xl font-heading font-bold text-foreground mt-1">{leadCounts.new}</p>
         </div>
-        <div className="p-4 rounded-xl bg-success/10 border border-success/30">
-          <p className="text-2xl font-heading font-bold text-success">{leadCounts.closed}</p>
-          <p className="text-sm text-muted-foreground">Own Close</p>
+
+        {/* Closed Won */}
+        <div className="p-4 rounded-2xl bg-card/85 backdrop-blur-xl border border-emerald-500/25 shadow-xs hover:border-emerald-500/50 transition-all">
+          <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Won / Closed</p>
+          <p className="text-2xl sm:text-3xl font-heading font-bold text-emerald-600 dark:text-emerald-400 mt-1">{leadCounts.closed}</p>
         </div>
-        <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/30">
-          <p className="text-2xl font-heading font-bold text-destructive">{leadCounts.lost}</p>
-          <p className="text-sm text-muted-foreground">Own Loss</p>
+
+        {/* Follow Ups */}
+        <div className="p-4 rounded-2xl bg-card/85 backdrop-blur-xl border border-amber-500/25 shadow-xs hover:border-amber-500/50 transition-all">
+          <p className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">Follow Ups</p>
+          <p className="text-2xl sm:text-3xl font-heading font-bold text-amber-600 dark:text-amber-400 mt-1">{leadCounts.followUp}</p>
         </div>
-        <div className="p-4 rounded-xl bg-warning/10 border border-warning/30">
-          <p className="text-2xl font-heading font-bold text-warning">{leadCounts.followUp}</p>
-          <p className="text-sm text-muted-foreground">Follow Up</p>
+
+        {/* Lost */}
+        <div className="p-4 rounded-2xl bg-card/85 backdrop-blur-xl border border-rose-500/25 shadow-xs hover:border-rose-500/50 transition-all">
+          <p className="text-xs font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400">Own Loss</p>
+          <p className="text-2xl sm:text-3xl font-heading font-bold text-muted-foreground mt-1">{leadCounts.lost}</p>
         </div>
       </motion.div>
 
-      {/* Filters */}
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-        className="flex flex-col lg:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input placeholder="Search leads..." value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
+      {/* Filters & Search */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between"
+      >
+        <div className="relative flex-1 group">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <Input
+            placeholder="Search prospect by company, phone, business type..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 h-10 rounded-xl bg-card border-border/80 text-xs sm:text-sm shadow-xs focus:border-primary"
+          />
         </div>
 
-        <Select value={scoreFilter} onValueChange={setScoreFilter}>
-          <SelectTrigger className="w-full lg:w-40"><SelectValue placeholder="Score" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All">All Scores</SelectItem>
-            {leadScores.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-          </SelectContent>
-        </Select>
-
-        {!isOpsManager && (
-          <Select value={branchFilter} onValueChange={setBranchFilter}>
-            <SelectTrigger className="w-full lg:w-48"><SelectValue placeholder="Branch" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All">All Branches</SelectItem>
-              {branches.map((b) => (
-                <SelectItem key={b._id} value={b._id}>{b.name}</SelectItem>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={scoreFilter} onValueChange={setScoreFilter}>
+            <SelectTrigger className="w-full sm:w-36 h-10 rounded-xl bg-card text-xs">
+              <SelectValue placeholder="Score" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="All">All Scores</SelectItem>
+              {leadScores.map((s) => (
+                <SelectItem key={s} value={s}>{s}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-        )}
 
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {statuses.slice(0, 5).map((status) => (
-            <Button key={status} variant={selectedStatus === status ? 'default' : 'outline'} size="sm"
-              onClick={() => setSelectedStatus(status)} className="whitespace-nowrap">
-              {status}
-            </Button>
-          ))}
+          {!isOpsManager && (
+            <Select value={branchFilter} onValueChange={setBranchFilter}>
+              <SelectTrigger className="w-full sm:w-44 h-10 rounded-xl bg-card text-xs">
+                <SelectValue placeholder="Branch" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="All">All Branches</SelectItem>
+                {branches.map((b) => (
+                  <SelectItem key={b._id} value={b._id}>{b.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full">
+            {statuses.slice(0, 5).map((status) => (
+              <Button
+                key={status}
+                variant={selectedStatus === status ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedStatus(status)}
+                className={`h-9 px-3 text-xs font-semibold rounded-xl whitespace-nowrap transition-all ${
+                  selectedStatus === status
+                    ? 'bg-primary text-white shadow-xs'
+                    : 'bg-card hover:bg-secondary text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {status}
+              </Button>
+            ))}
+          </div>
         </div>
       </motion.div>
 
       {/* Leads Table */}
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-        className="bg-card rounded-xl border border-border shadow-card overflow-hidden">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.25 }}
+        className="bg-card/90 backdrop-blur-xl rounded-2xl border border-border/80 shadow-sm overflow-hidden"
+      >
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-muted/50 border-b border-border">
+            <thead className="bg-secondary/40 border-b border-border/80">
               <tr>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Lead</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Business</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Score</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Branch</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Assigned To</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Status</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Next F/U</th>
-                <th className="text-left p-4 text-sm font-medium text-muted-foreground">Actions</th>
+                <th className="text-left p-4 text-xs font-heading font-semibold uppercase tracking-wider text-muted-foreground">Prospect Lead</th>
+                <th className="text-left p-4 text-xs font-heading font-semibold uppercase tracking-wider text-muted-foreground">Business</th>
+                <th className="text-left p-4 text-xs font-heading font-semibold uppercase tracking-wider text-muted-foreground">Score</th>
+                <th className="text-left p-4 text-xs font-heading font-semibold uppercase tracking-wider text-muted-foreground">Branch</th>
+                <th className="text-left p-4 text-xs font-heading font-semibold uppercase tracking-wider text-muted-foreground">Assigned Rep</th>
+                <th className="text-left p-4 text-xs font-heading font-semibold uppercase tracking-wider text-muted-foreground">Pipeline Status</th>
+                <th className="text-left p-4 text-xs font-heading font-semibold uppercase tracking-wider text-muted-foreground">Next Touch</th>
+                <th className="text-left p-4 text-xs font-heading font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/60">
               {loading ? (
                 <LeadTableSkeleton />
               ) : filteredLeads.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-10 text-center">
+                  <td colSpan={8} className="p-12 text-center">
                     <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
-                      <Search className="w-8 h-8 opacity-50" />
-                      <p className="font-medium text-foreground">No leads found</p>
-                      <p className="text-sm">Try changing your search or filters.</p>
+                      <Search className="w-8 h-8 opacity-40 text-primary" />
+                      <p className="font-semibold text-foreground">No leads matched your criteria</p>
+                      <p className="text-xs">Adjust your search keyword or clear active filters.</p>
                     </div>
                   </td>
                 </tr>
               ) : (
                 filteredLeads.map((lead, index) => (
-                  <motion.tr key={lead._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.03 }} className="hover:bg-muted/30 transition-colors">
+                  <motion.tr
+                    key={lead._id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(index * 0.02, 0.3) }}
+                    className="hover:bg-secondary/30 transition-colors group"
+                  >
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center text-primary font-semibold">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#FF1B7A] via-[#7928CA] to-[#00D8F6] flex items-center justify-center text-white font-heading font-bold text-sm shadow-xs shrink-0">
                           {lead.name.charAt(0)}
                         </div>
-                        <div>
-                          <p className="font-medium text-foreground">{lead.name}</p>
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Phone className="w-3 h-3" />{lead.contactNumber}
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground text-sm group-hover:text-primary transition-colors truncate">{lead.name}</p>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                            <Phone className="w-3 h-3 text-slate-400" />
+                            <span>{lead.contactNumber}</span>
                           </div>
                           {lead.email && (
-                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                              <Mail className="w-3 h-3" />{lead.email}
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                              <Mail className="w-3 h-3 text-slate-400" />
+                              <span className="truncate">{lead.email}</span>
                             </div>
                           )}
                         </div>
