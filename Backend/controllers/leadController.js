@@ -816,6 +816,8 @@ exports.createPublicWebsiteLead = async (req, res) => {
       contactNumber,
       phone,
       email,
+      company,
+      businessName,
       businessType,
       requirements,
       service,
@@ -838,14 +840,24 @@ exports.createPublicWebsiteLead = async (req, res) => {
 
     const leadAutoAssignService = require("../services/leadAutoAssignService");
 
+    const resolvedCompany = (company || businessName || "").trim();
+    const resolvedBusinessType = (resolvedCompany || businessType || (service ? `${service} Inquiry` : "Website Lead")).trim();
+
+    const formattedNotesParts = [
+      resolvedCompany ? `Company: ${resolvedCompany}` : null,
+      service ? `Selected Service: ${service}` : null,
+      budget ? `Budget: ${budget}` : null,
+      (message || notes) ? `Business Requirement:\n${message || notes}` : null,
+    ].filter(Boolean);
+
     const payload = {
       name: finalName,
       contactNumber: finalPhone,
       phone: finalPhone,
       email: (email || "").trim(),
-      businessType: businessType || (service ? `${service} Inquiry` : "Website Lead"),
+      businessType: resolvedBusinessType,
       requirement: service || (Array.isArray(requirements) ? requirements.join(", ") : requirements) || "Website Inquiry",
-      notes: message || notes || "",
+      notes: formattedNotesParts.length > 0 ? formattedNotesParts.join("\n\n") : "Inquiry submitted via website contact form.",
       budget: budget || 0,
       timeline: timeline || "Normal",
       source: "Website",

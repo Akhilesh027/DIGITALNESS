@@ -21,6 +21,7 @@ const router = express.Router();
 // Public Website & Form Lead Capture (no auth required)
 router.post("/public", createPublicWebsiteLead);
 router.post("/website", createPublicWebsiteLead);
+router.post("/contact", createPublicWebsiteLead);
 
 // Public Webhook for Meta Ads, WhatsApp, Google Ads & Lead Capture
 router.get("/webhook/inbound", verifyMetaWebhookSignature);

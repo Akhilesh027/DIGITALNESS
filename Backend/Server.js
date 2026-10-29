@@ -122,6 +122,7 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", authRoutes);
 app.use("/api/leads", leadRoutes);
+app.post("/api/contact", require("./controllers/leadController.js").createPublicWebsiteLead);
 app.use("/api/deals", dealRoutes);
 app.use("/api/customers", customerRoutes);
 app.use("/api/works", workRoutes);

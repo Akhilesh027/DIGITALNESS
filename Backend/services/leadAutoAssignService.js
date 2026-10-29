@@ -18,7 +18,16 @@ class LeadAutoAssignService {
     const highIntentKeywords = ["immediate", "urgent", "asap", "ready to start", "high budget", "growth", "ads", "website"];
     const hasHighIntent = highIntentKeywords.some((kw) => text.includes(kw));
 
-    const numBudget = Number(budget) || 0;
+    let numBudget = 0;
+    if (typeof budget === "number") {
+      numBudget = budget;
+    } else if (typeof budget === "string") {
+      const matches = budget.match(/\d[\d,]*/g);
+      if (matches && matches.length > 0) {
+        const parsedNums = matches.map((m) => Number(m.replace(/,/g, ""))).filter((n) => !isNaN(n));
+        numBudget = Math.max(...parsedNums, 0);
+      }
+    }
 
     if (numBudget >= 30000 || hasHighIntent || text.includes("call me today")) {
       return {
@@ -141,7 +150,9 @@ class LeadAutoAssignService {
       leadScore: scoring.score,
       source: normalizedSource,
       timeline: normalizedTimeline,
-      budgetRange: budget ? `₹${Number(budget).toLocaleString("en-IN")}` : "₹25,000",
+      budgetRange: typeof budget === "string" && budget.trim() && isNaN(Number(budget))
+        ? budget.trim()
+        : (budget && !isNaN(Number(budget)) ? `₹${Number(budget).toLocaleString("en-IN")}` : (budget ? String(budget) : "Not decided")),
       requirements: reqArray.length > 0 ? reqArray : ["Website Inbound"],
       status: "New",
       assignedTo: assignedRep ? assignedRep._id : null,
