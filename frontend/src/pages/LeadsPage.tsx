@@ -849,11 +849,10 @@ export default function LeadsPage() {
                 variant={selectedStatus === status ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setSelectedStatus(status)}
-                className={`h-9 px-3 text-xs font-semibold rounded-xl whitespace-nowrap transition-all ${
-                  selectedStatus === status
-                    ? 'bg-primary text-white shadow-xs'
-                    : 'bg-card hover:bg-secondary text-muted-foreground hover:text-foreground'
-                }`}
+                className={`h-9 px-3 text-xs font-semibold rounded-xl whitespace-nowrap transition-all ${selectedStatus === status
+                  ? 'bg-primary text-white shadow-xs'
+                  : 'bg-card hover:bg-secondary text-muted-foreground hover:text-foreground'
+                  }`}
               >
                 {status}
               </Button>

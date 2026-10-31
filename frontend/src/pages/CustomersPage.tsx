@@ -923,11 +923,10 @@ export default function CustomersPage() {
                     <div className="flex flex-wrap items-center gap-1.5 pt-2">
                       <Badge
                         variant={customer.status === "Inactive" ? "destructive" : "default"}
-                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
-                          customer.status === "Inactive"
-                            ? "bg-rose-500/15 text-rose-600 border-rose-500/30"
-                            : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
-                        }`}
+                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${customer.status === "Inactive"
+                          ? "bg-rose-500/15 text-rose-600 border-rose-500/30"
+                          : "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                          }`}
                       >
                         {customer.status || "Active"}
                       </Badge>
@@ -945,11 +944,10 @@ export default function CustomersPage() {
                       <Badge variant="outline" className="text-[10px] font-medium px-2 py-0.5 rounded-md">{docsCount} Docs</Badge>
                       <Badge
                         variant="outline"
-                        className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${
-                          hasClientLogin
-                            ? "bg-sky-500/10 text-sky-600 border-sky-500/30 font-semibold"
-                            : "text-muted-foreground"
-                        }`}
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-md ${hasClientLogin
+                          ? "bg-sky-500/10 text-sky-600 border-sky-500/30 font-semibold"
+                          : "text-muted-foreground"
+                          }`}
                       >
                         {hasClientLogin ? "Login Active" : "No Login"}
                       </Badge>
@@ -989,11 +987,10 @@ export default function CustomersPage() {
                       variant={customer.accessControl?.isPortalLocked ? "destructive" : "outline"}
                       size="sm"
                       onClick={() => setRechargeCustomer(customer)}
-                      className={`text-xs px-2 h-8 rounded-lg font-semibold ${
-                        customer.accessControl?.isPortalLocked
-                          ? "bg-rose-600 text-white font-bold"
-                          : "text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                      }`}
+                      className={`text-xs px-2 h-8 rounded-lg font-semibold ${customer.accessControl?.isPortalLocked
+                        ? "bg-rose-600 text-white font-bold"
+                        : "text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                        }`}
                     >
                       <CreditCard className="w-3.5 h-3.5 mr-1 shrink-0" />
                       <span className="truncate">{customer.accessControl?.isPortalLocked ? "Hold / Unlock" : "Recharge"}</span>

@@ -83,7 +83,7 @@ const emptyBlog: BlogForm = {
   metaTitle: "",
   metaDescription: "",
   metaKeywords: "",
-  status: "Draft",
+  status: "Published",
   isFeatured: false,
 };
 

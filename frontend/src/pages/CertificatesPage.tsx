@@ -505,8 +505,8 @@ export default function CertificatesPage() {
                         <button
                           onClick={() => handleToggleStatus(cert._id)}
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer transition ${isActive
-                              ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
-                              : "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
+                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                            : "bg-red-50 text-red-700 hover:bg-red-100 border border-red-200"
                             }`}
                           title="Click to toggle Active / Revoked status"
                         >

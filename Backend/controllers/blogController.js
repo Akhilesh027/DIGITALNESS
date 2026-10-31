@@ -19,16 +19,13 @@ const generateSlug = (title = "") => {
 
 const toArray = (value) => {
   if (!value) return [];
-
   if (Array.isArray(value)) return value;
-
   if (typeof value === "string") {
     return value
       .split(",")
       .map((item) => item.trim())
       .filter(Boolean);
   }
-
   return [];
 };
 
@@ -57,7 +54,6 @@ const normalizePayload = (body = {}, userId = null) => {
   }
 
   data.updatedBy = userId;
-
   return data;
 };
 
@@ -81,7 +77,6 @@ exports.createBlog = async (req, res) => {
     }
 
     const existingSlug = await Blog.findOne({ slug: payload.slug });
-
     if (existingSlug) {
       payload.slug = `${payload.slug}-${Date.now()}`;
     }
@@ -98,7 +93,6 @@ exports.createBlog = async (req, res) => {
     });
   } catch (error) {
     console.log("Create blog error:", error);
-
     res.status(500).json({
       success: false,
       message: "Failed to create blog",
@@ -110,7 +104,6 @@ exports.createBlog = async (req, res) => {
 exports.getBlogs = async (req, res) => {
   try {
     const { status, category, featured, search } = req.query;
-
     const filter = {};
 
     if (status && status !== "All") filter.status = status;
@@ -125,9 +118,22 @@ exports.getBlogs = async (req, res) => {
       ];
     }
 
-    // Public website can pass ?public=true to show only published blogs
-    if (req.query.public === "true") {
-      filter.status = "Published";
+    const isPublic = req.query.public === "true" || (req.originalUrl && req.originalUrl.includes("/public"));
+
+    if (isPublic && !status) {
+      // For public website, try published first
+      const published = await Blog.find({ ...filter, status: "Published" })
+        .populate("createdBy", "name email role")
+        .sort({ createdAt: -1 });
+
+      if (published.length > 0) {
+        return res.json({
+          success: true,
+          count: published.length,
+          data: published,
+        });
+      }
+      // If none marked 'Published' yet, return all to allow immediate preview of created blogs
     }
 
     const blogs = await Blog.find(filter)
@@ -142,7 +148,6 @@ exports.getBlogs = async (req, res) => {
     });
   } catch (error) {
     console.log("Get blogs error:", error);
-
     res.status(500).json({
       success: false,
       message: "Failed to fetch blogs",
@@ -179,10 +184,14 @@ exports.getBlogById = async (req, res) => {
 
 exports.getBlogBySlug = async (req, res) => {
   try {
-    const blog = await Blog.findOne({
+    let blog = await Blog.findOne({
       slug: req.params.slug,
       status: "Published",
     });
+
+    if (!blog) {
+      blog = await Blog.findOne({ slug: req.params.slug });
+    }
 
     if (!blog) {
       return res.status(404).json({
@@ -214,7 +223,6 @@ exports.updateBlog = async (req, res) => {
     }
 
     const existingBlog = await Blog.findById(req.params.id);
-
     if (!existingBlog) {
       return res.status(404).json({
         success: false,
@@ -258,7 +266,6 @@ exports.updateBlog = async (req, res) => {
     });
   } catch (error) {
     console.log("Update blog error:", error);
-
     res.status(500).json({
       success: false,
       message: "Failed to update blog",
@@ -277,7 +284,6 @@ exports.deleteBlog = async (req, res) => {
     }
 
     const blog = await Blog.findById(req.params.id);
-
     if (!blog) {
       return res.status(404).json({
         success: false,
@@ -293,7 +299,6 @@ exports.deleteBlog = async (req, res) => {
     });
   } catch (error) {
     console.log("Delete blog error:", error);
-
     res.status(500).json({
       success: false,
       message: "Failed to delete blog",
@@ -312,7 +317,6 @@ exports.updateBlogStatus = async (req, res) => {
     }
 
     const { status } = req.body;
-
     if (!["Draft", "Published", "Archived"].includes(status)) {
       return res.status(400).json({
         success: false,
@@ -366,7 +370,6 @@ exports.toggleFeaturedBlog = async (req, res) => {
     }
 
     const blog = await Blog.findById(req.params.id);
-
     if (!blog) {
       return res.status(404).json({
         success: false,
