@@ -271,7 +271,27 @@ export default function BlogsPage() {
     }
   };
 
-  const handleImageUpload = (file: File, key: "featuredImage" | "bannerImage") => {
+  const handleImageUpload = async (file: File, key: "featuredImage" | "bannerImage") => {
+    try {
+      const data = new FormData();
+      data.append("file", file);
+      const res = await axios.post(`${API_URL}/upload/asset`, data, {
+        headers: {
+          Authorization: getAuthConfig().headers.Authorization,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      if (res.data?.success && res.data.url) {
+        const full = res.data.url.startsWith("http")
+          ? res.data.url
+          : `${API_URL.replace(/\/api\/?$/, "")}${res.data.url}`;
+        setForm((prev) => ({ ...prev, [key]: full }));
+        toast({ title: "Image uploaded successfully!" });
+        return;
+      }
+    } catch {
+      // Fallback to local DataURL
+    }
     const reader = new FileReader();
 
     reader.onload = () => {

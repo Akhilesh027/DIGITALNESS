@@ -35,6 +35,7 @@ import AutoReportsPage from "./pages/AutoReportsPage";
 import WorkflowPage from "./pages/WorkflowPage";
 import EmployeeDailyUpdate from "./pages/EmployeeDailyUpdate";
 import BlogsPage from "./pages/BlogsPage";
+import CertificatesPage from "./pages/CertificatesPage";
 import AdminDailyUpdates from "./pages/AdminDailyUpdates";
 import AttendancePage from "./pages/AttendancePage";
 import RecruitmentPage from "./pages/RecruitmentPage";
@@ -118,197 +119,199 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <PublicRoute>
-                <LoginPage />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/client-login"
-            element={<Navigate to="/" replace />}
-          />
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <PublicRoute>
+                  <LoginPage />
+                </PublicRoute>
+              }
+            />
+            <Route
+              path="/client-login"
+              element={<Navigate to="/" replace />}
+            />
 
-          <Route
-            element={
-              <ProtectedRoute>
-                <DashboardLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/employees" element={<EmployeesPage />} />
-            <Route path="/leads" element={<LeadsPage />} />
-            <Route path="/customers" element={<CustomersPage />} />
-            <Route path="/works" element={<WorksPage />} />
-            <Route path="/telecaller" element={<TelecallerPage />} />
-            <Route path="/accounts" element={<AccountsPage />} />
-            <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/invoices" element={<InvoicesPage />} />
-            <Route path="/deliverables" element={<DeliverablesPage />} />
-            <Route path="/payments" element={<PaymentsPage />} />
-            <Route path="/client-portal" element={<ClientPortalPage />} />
-            <Route path="/employee-report" element={<EmployeeReportPage />} />
-            <Route path="/sales-pipeline" element={<SalesPipelinePage />} />
-            <Route path="/proposals" element={<ProposalsPage />} />
-            <Route path="/branches" element={<BranchesPage />} />
-            <Route path="/AttendancePage" element={<AttendancePage />} />
-            
-            <Route path="/daily-update" element={<EmployeeDailyUpdate />} />
             <Route
-              path="/admin/daily-updates"
-              element={<AdminDailyUpdates />}
-            />
-            <Route path="/daily-update" element={<EmployeeDailyUpdate />} />
-            <Route
-              path="/daily-updates-review"
-              element={<AdminDailyUpdates />}
-            />
-            <Route path="/blogs-page" element={<BlogsPage />} />
-            <Route path="/templates" element={<TemplatesPage />} />
-            <Route path="/tickets" element={<TicketsPage />} />
-            <Route path="/tasks" element={<TasksPage />} />
-            <Route path="/communications" element={<CommunicationsPage />} />
-            <Route path="/approvals" element={<ApprovalsPage />} />
-            <Route path="/performance" element={<PerformancePage />} />
-            <Route path="/expenses" element={<ExpensesPage />} />
-            <Route path="/notifications" element={<NotificationsPage />} />
-            <Route
-              path="/auto-reports"
               element={
-                <UpcomingFeatureGuard
-                  title="Autonomous Reporting Engine"
-                  category="Client Intelligence"
-                  description="Scheduled executive digests, automated KPI infographics, and real-time agency client performance exports."
-                  highlights={["Automated client performance summaries", "Weekly metric roll-ups", "Exportable executive PDFs"]}
-                >
-                  <AutoReportsPage />
-                </UpcomingFeatureGuard>
+                <ProtectedRoute>
+                  <DashboardLayout />
+                </ProtectedRoute>
               }
-            />
-            <Route
-              path="/workflow"
-              element={
-                <UpcomingFeatureGuard
-                  title="Visual Workflow Automation"
-                  category="Process Orchestration"
-                  description="Automated trigger-and-action rules for SLA escalations, lead auto-assignment, and customer communication triggers."
-                  highlights={["Visual event-driven workflow rules", "Automatic lead triage & routing", "Multi-channel SLA alerts"]}
-                >
-                  <WorkflowPage />
-                </UpcomingFeatureGuard>
-              }
-            />
-            <Route path="/RecruitmentPage" element={<RecruitmentPage />} />
-            <Route path="/audit-logs" element={<AuditLogsPage />} />
-            <Route
-              path="/content-calendar"
-              element={
-                <UpcomingFeatureGuard
-                  title="AI Content Calendar"
-                  category="Autonomous Social Media"
-                  description="Real-time festival and industry trend scanning, multi-brand post schedules, and autonomous creative draft generation."
-                  highlights={["Indian festival & commercial holiday detection", "Multi-platform scheduling (FB, IG, GBP)", "Autonomous creative caption generator"]}
-                >
-                  <ContentCalendarPage />
-                </UpcomingFeatureGuard>
-              }
-            />
-            <Route path="/operations/calendar" element={<ContentOperationsWorkspace />} />
-            <Route path="/campaign-operations" element={<ContentOperationsWorkspace />} />
-            <Route path="/executive-dashboard" element={<AgencyExecutiveDashboard />} />
-            <Route path="/client-reporting" element={<ClientReportingWorkspace />} />
-            <Route path="/system/certification" element={<ProductionCertificationDashboard />} />
-            <Route
-              path="/creative-studio"
-              element={
-                <UpcomingFeatureGuard
-                  title="AI Creative Studio"
-                  category="Visual Asset Generator"
-                  description="Autonomous prompt-to-banner design, Canva asset generation, brand-safe palette styling, and one-click cloud publishing."
-                  highlights={["One-click ad creatives & carousel banners", "Multi-aspect ratio rendering (1:1, 9:16)", "Direct Cloudinary asset storage"]}
-                >
-                  <CreativeStudioPage />
-                </UpcomingFeatureGuard>
-              }
-            />
-            <Route
-              path="/scheduler"
-              element={
-                <UpcomingFeatureGuard
-                  title="24/7 Automation Scheduler"
-                  category="Background Queue Engine"
-                  description="Central control tower managing BullMQ background workers, recurring cron routines, and system-wide task execution."
-                  highlights={["Real-time worker concurrency monitor", "Automatic job failover & retry", "Autonomous SLA guardian"]}
-                >
-                  <SchedulerPage />
-                </UpcomingFeatureGuard>
-              }
-            />
-            <Route path="/customers/:id/onboarding" element={<CustomerOnboardingPage />} />
-            <Route
-              path="/ai-workspace"
-              element={
-                <UpcomingFeatureGuard
-                  title="AI Agent Workspace & Copilot"
-                  category="Agency Supercomputer"
-                  description="Conversational agentic copilot capable of answering agency questions, analyzing customer health, and dispatching CRM workflows."
-                  highlights={["Multi-agent chat assistant", "Live database insights & query tools", "Automated marketing audits"]}
-                >
-                  <AIWorkspacePage />
-                </UpcomingFeatureGuard>
-              }
-            />
-            <Route
-              path="/agent-activity"
-              element={
-                <UpcomingFeatureGuard
-                  title="AI Agent Activity Monitor"
-                  category="Telemetry & Token Audit"
-                  description="Live audit trail of background agent executions, model token consumption, success rates, and autonomous decisions."
-                  highlights={["Live agent task stream", "Token expense analytics", "Worker event logs & forensics"]}
-                >
-                  <AgentActivityPage />
-                </UpcomingFeatureGuard>
-              }
-            />
-            <Route
-              path="/ads"
-              element={
-                <UpcomingFeatureGuard
-                  title="AI Ad Operations & Spend Lock"
-                  category="Meta & Google Performance Ads"
-                  description="Unified ad campaign builder, real-time ROAS tracker, and emergency spending kill-switches across Meta and Google Ads."
-                  highlights={["Emergency spend & write safety locks", "Meta & Google Ads sync", "Automated audience cohort optimization"]}
-                >
-                  <AdCampaignsPage />
-                </UpcomingFeatureGuard>
-              }
-            />
-            <Route
-              path="/ad-campaigns"
-              element={
-                <UpcomingFeatureGuard
-                  title="AI Ad Operations & Spend Lock"
-                  category="Meta & Google Performance Ads"
-                  description="Unified ad campaign builder, real-time ROAS tracker, and emergency spending kill-switches across Meta and Google Ads."
-                  highlights={["Emergency spend & write safety locks", "Meta & Google Ads sync", "Automated audience cohort optimization"]}
-                >
-                  <AdCampaignsPage />
-                </UpcomingFeatureGuard>
-              }
-            />
-          </Route>
+            >
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/employees" element={<EmployeesPage />} />
+              <Route path="/leads" element={<LeadsPage />} />
+              <Route path="/customers" element={<CustomersPage />} />
+              <Route path="/works" element={<WorksPage />} />
+              <Route path="/telecaller" element={<TelecallerPage />} />
+              <Route path="/accounts" element={<AccountsPage />} />
+              <Route path="/reports" element={<ReportsPage />} />
+              <Route path="/invoices" element={<InvoicesPage />} />
+              <Route path="/deliverables" element={<DeliverablesPage />} />
+              <Route path="/payments" element={<PaymentsPage />} />
+              <Route path="/client-portal" element={<ClientPortalPage />} />
+              <Route path="/employee-report" element={<EmployeeReportPage />} />
+              <Route path="/sales-pipeline" element={<SalesPipelinePage />} />
+              <Route path="/proposals" element={<ProposalsPage />} />
+              <Route path="/branches" element={<BranchesPage />} />
+              <Route path="/AttendancePage" element={<AttendancePage />} />
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-</ThemeProvider>
+              <Route path="/daily-update" element={<EmployeeDailyUpdate />} />
+              <Route
+                path="/admin/daily-updates"
+                element={<AdminDailyUpdates />}
+              />
+              <Route path="/daily-update" element={<EmployeeDailyUpdate />} />
+              <Route
+                path="/daily-updates-review"
+                element={<AdminDailyUpdates />}
+              />
+              <Route path="/blogs-page" element={<BlogsPage />} />
+              <Route path="/certificates" element={<CertificatesPage />} />
+              <Route path="/certificates-page" element={<CertificatesPage />} />
+              <Route path="/templates" element={<TemplatesPage />} />
+              <Route path="/tickets" element={<TicketsPage />} />
+              <Route path="/tasks" element={<TasksPage />} />
+              <Route path="/communications" element={<CommunicationsPage />} />
+              <Route path="/approvals" element={<ApprovalsPage />} />
+              <Route path="/performance" element={<PerformancePage />} />
+              <Route path="/expenses" element={<ExpensesPage />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
+              <Route
+                path="/auto-reports"
+                element={
+                  <UpcomingFeatureGuard
+                    title="Autonomous Reporting Engine"
+                    category="Client Intelligence"
+                    description="Scheduled executive digests, automated KPI infographics, and real-time agency client performance exports."
+                    highlights={["Automated client performance summaries", "Weekly metric roll-ups", "Exportable executive PDFs"]}
+                  >
+                    <AutoReportsPage />
+                  </UpcomingFeatureGuard>
+                }
+              />
+              <Route
+                path="/workflow"
+                element={
+                  <UpcomingFeatureGuard
+                    title="Visual Workflow Automation"
+                    category="Process Orchestration"
+                    description="Automated trigger-and-action rules for SLA escalations, lead auto-assignment, and customer communication triggers."
+                    highlights={["Visual event-driven workflow rules", "Automatic lead triage & routing", "Multi-channel SLA alerts"]}
+                  >
+                    <WorkflowPage />
+                  </UpcomingFeatureGuard>
+                }
+              />
+              <Route path="/RecruitmentPage" element={<RecruitmentPage />} />
+              <Route path="/audit-logs" element={<AuditLogsPage />} />
+              <Route
+                path="/content-calendar"
+                element={
+                  <UpcomingFeatureGuard
+                    title="AI Content Calendar"
+                    category="Autonomous Social Media"
+                    description="Real-time festival and industry trend scanning, multi-brand post schedules, and autonomous creative draft generation."
+                    highlights={["Indian festival & commercial holiday detection", "Multi-platform scheduling (FB, IG, GBP)", "Autonomous creative caption generator"]}
+                  >
+                    <ContentCalendarPage />
+                  </UpcomingFeatureGuard>
+                }
+              />
+              <Route path="/operations/calendar" element={<ContentOperationsWorkspace />} />
+              <Route path="/campaign-operations" element={<ContentOperationsWorkspace />} />
+              <Route path="/executive-dashboard" element={<AgencyExecutiveDashboard />} />
+              <Route path="/client-reporting" element={<ClientReportingWorkspace />} />
+              <Route path="/system/certification" element={<ProductionCertificationDashboard />} />
+              <Route
+                path="/creative-studio"
+                element={
+                  <UpcomingFeatureGuard
+                    title="AI Creative Studio"
+                    category="Visual Asset Generator"
+                    description="Autonomous prompt-to-banner design, Canva asset generation, brand-safe palette styling, and one-click cloud publishing."
+                    highlights={["One-click ad creatives & carousel banners", "Multi-aspect ratio rendering (1:1, 9:16)", "Direct Cloudinary asset storage"]}
+                  >
+                    <CreativeStudioPage />
+                  </UpcomingFeatureGuard>
+                }
+              />
+              <Route
+                path="/scheduler"
+                element={
+                  <UpcomingFeatureGuard
+                    title="24/7 Automation Scheduler"
+                    category="Background Queue Engine"
+                    description="Central control tower managing BullMQ background workers, recurring cron routines, and system-wide task execution."
+                    highlights={["Real-time worker concurrency monitor", "Automatic job failover & retry", "Autonomous SLA guardian"]}
+                  >
+                    <SchedulerPage />
+                  </UpcomingFeatureGuard>
+                }
+              />
+              <Route path="/customers/:id/onboarding" element={<CustomerOnboardingPage />} />
+              <Route
+                path="/ai-workspace"
+                element={
+                  <UpcomingFeatureGuard
+                    title="AI Agent Workspace & Copilot"
+                    category="Agency Supercomputer"
+                    description="Conversational agentic copilot capable of answering agency questions, analyzing customer health, and dispatching CRM workflows."
+                    highlights={["Multi-agent chat assistant", "Live database insights & query tools", "Automated marketing audits"]}
+                  >
+                    <AIWorkspacePage />
+                  </UpcomingFeatureGuard>
+                }
+              />
+              <Route
+                path="/agent-activity"
+                element={
+                  <UpcomingFeatureGuard
+                    title="AI Agent Activity Monitor"
+                    category="Telemetry & Token Audit"
+                    description="Live audit trail of background agent executions, model token consumption, success rates, and autonomous decisions."
+                    highlights={["Live agent task stream", "Token expense analytics", "Worker event logs & forensics"]}
+                  >
+                    <AgentActivityPage />
+                  </UpcomingFeatureGuard>
+                }
+              />
+              <Route
+                path="/ads"
+                element={
+                  <UpcomingFeatureGuard
+                    title="AI Ad Operations & Spend Lock"
+                    category="Meta & Google Performance Ads"
+                    description="Unified ad campaign builder, real-time ROAS tracker, and emergency spending kill-switches across Meta and Google Ads."
+                    highlights={["Emergency spend & write safety locks", "Meta & Google Ads sync", "Automated audience cohort optimization"]}
+                  >
+                    <AdCampaignsPage />
+                  </UpcomingFeatureGuard>
+                }
+              />
+              <Route
+                path="/ad-campaigns"
+                element={
+                  <UpcomingFeatureGuard
+                    title="AI Ad Operations & Spend Lock"
+                    category="Meta & Google Performance Ads"
+                    description="Unified ad campaign builder, real-time ROAS tracker, and emergency spending kill-switches across Meta and Google Ads."
+                    highlights={["Emergency spend & write safety locks", "Meta & Google Ads sync", "Automated audience cohort optimization"]}
+                  >
+                    <AdCampaignsPage />
+                  </UpcomingFeatureGuard>
+                }
+              />
+            </Route>
+
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;

@@ -30,6 +30,8 @@ import {
   Newspaper,
   BriefcaseBusiness,
   ShieldCheck,
+  Award,
+  Globe,
   Palette,
   Clock,
   Bot,
@@ -306,12 +308,6 @@ const navSections: NavSection[] = [
         roles: ['Admin'],
       },
       {
-        label: 'Blog Management',
-        path: '/blogs-page',
-        icon: Newspaper,
-        roles: ['Admin', 'Operational Manager'],
-      },
-      {
         label: 'Notifications',
         path: '/notifications',
         icon: Bell,
@@ -328,6 +324,23 @@ const navSections: NavSection[] = [
           'Support',
           'Telecaller',
         ],
+      },
+    ],
+  },
+  {
+    title: 'Website Management',
+    items: [
+      {
+        label: 'Blog Management',
+        path: '/blogs-page',
+        icon: Newspaper,
+        roles: ['Admin', 'Operational Manager', 'Content Writer'],
+      },
+      {
+        label: 'Certificates Hub',
+        path: '/certificates',
+        icon: Award,
+        roles: ['Admin', 'Operational Manager'],
       },
     ],
   },
@@ -372,7 +385,7 @@ export function Sidebar() {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-        }).catch(() => {});
+        }).catch(() => { });
       }
     } catch {
       // ignore

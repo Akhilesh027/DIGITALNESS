@@ -142,6 +142,8 @@ app.use('/api/daily-updates', dailyUpdateRoutes);
 app.use("/api/client-attachments", clientAttachmentRoutes);
 app.use("/api/reports", require("./routes/reportRoutes"));
 app.use("/api/blogs", require("./routes/blogRoutes.js"));
+app.use("/api/certificates", require("./routes/certificateRoutes.js"));
+app.use("/api/upload", require("./routes/uploadRoutes.js"));
 app.use("/api/recruitment", require("./routes/recruitmentRoutes.js"));
 app.use("/api/attendance", require("./routes/attendanceRoutes.js"));
 app.use("/api/client-locations", require("./routes/clientLocationRoutes.js"));
