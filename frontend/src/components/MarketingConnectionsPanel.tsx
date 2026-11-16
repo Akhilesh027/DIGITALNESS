@@ -36,7 +36,9 @@ import {
   disconnectPlatformAccount,
   checkConnectionHealth,
   startMetaOAuth,
+  startGoogleBusinessOAuth,
   getMetaDiscoverySession,
+  discoverMetaPage,
   confirmMetaAssets,
   MarketingConnectionItem,
   ConnectionHealth,
@@ -72,6 +74,8 @@ export default function MarketingConnectionsPanel({ customerId, locations = [] }
   // Meta OAuth Discovery Session State
   const [metaDiscoveryModal, setMetaDiscoveryModal] = useState(false);
   const [discoverySession, setDiscoverySession] = useState<any>(null);
+  const [lookupPageId, setLookupPageId] = useState("");
+  const [pageLookupError, setPageLookupError] = useState("");
   const [selectedMetaAssets, setSelectedMetaAssets] = useState<{
     locationId: string;
     facebookPageId: string;
@@ -270,7 +274,7 @@ export default function MarketingConnectionsPanel({ customerId, locations = [] }
             size="sm"
             onClick={async () => {
               try {
-                const res = await startGoogleBusinessOAuth(customerId, locationId);
+                const res = await startGoogleBusinessOAuth(customerId, connectForm.locationId || undefined);
                 if (res.authUrl) {
                   window.location.href = res.authUrl;
                 }
@@ -393,6 +397,16 @@ export default function MarketingConnectionsPanel({ customerId, locations = [] }
 
           {discoverySession && (
             <div className="space-y-4 pt-2">
+              {discoverySession.discoveryWarnings?.map((warning: string) => (
+                <p key={warning} role="alert" className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">{warning}</p>
+              ))}
+              {!discoverySession.pages?.length && !discoverySession.adAccounts?.length && (
+                <div role="alert" className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-3 space-y-2">
+                  <p>No Meta assets were loaded. Check that you signed in with the Facebook account that manages your Pages and ad accounts, and allow the required assets and permissions during connection.</p>
+                  <p>Instagram must be a professional account linked to a Facebook Page available to this login.</p>
+                  <Button size="sm" variant="outline" disabled={submitting} onClick={() => handleStartMetaOAuth()}>Reconnect Meta</Button>
+                </div>
+              )}
               <div>
                 <label className="text-xs font-semibold text-slate-700">Assign to Branch Location</label>
                 <select
@@ -407,6 +421,7 @@ export default function MarketingConnectionsPanel({ customerId, locations = [] }
                     </option>
                   ))}
                 </select>
+                {!locations.length && <p className="text-xs text-slate-500 mt-1">No branch locations have been added for this customer. You can use the master account.</p>}
               </div>
 
               {/* Facebook Pages */}
@@ -432,6 +447,27 @@ export default function MarketingConnectionsPanel({ customerId, locations = [] }
                     </option>
                   ))}
                 </select>
+                {!discoverySession.pages?.length && <p className="text-xs text-amber-700 mt-1">No Facebook Pages were returned. Check Page access and the pages_show_list permission.</p>}
+                <div className="flex gap-2 mt-2">
+                  <Input aria-label="Facebook Page ID" placeholder="Facebook Page ID" value={lookupPageId} onChange={e => setLookupPageId(e.target.value)} />
+                  <Button variant="outline" disabled={submitting || !/^\d+$/.test(lookupPageId)} onClick={async () => {
+                    setPageLookupError("");
+                    setSubmitting(true);
+                    try {
+                      await discoverMetaPage(discoverySession.sessionId, lookupPageId);
+                      const refreshed = await getMetaDiscoverySession(discoverySession.sessionId);
+                      setDiscoverySession(refreshed);
+                      const page = refreshed.pages?.find((p: any) => p.pageId === lookupPageId);
+                      if (page) setSelectedMetaAssets(prev => ({ ...prev, facebookPageId: page.pageId, instagramBusinessAccountId: page.instagramBusinessAccountId || "" }));
+                      toast({ title: "Page found", description: "Review the Page and linked Instagram account before saving." });
+                    } catch (error: any) {
+                      setPageLookupError(error.response?.data?.message || error.message);
+                      toast({ title: "Page lookup failed", description: error.response?.data?.message || error.message, variant: "destructive" });
+                    } finally { setSubmitting(false); }
+                  }}>Find Page</Button>
+                </div>
+                {pageLookupError && <p role="alert" className="text-xs text-red-700 mt-1">{pageLookupError}</p>}
+                <p className="text-xs text-slate-500 mt-1">If your Page is missing from the list, look it up using its Page ID. Your existing Meta access must allow the lookup.</p>
               </div>
 
               {/* Instagram Accounts */}
@@ -468,13 +504,14 @@ export default function MarketingConnectionsPanel({ customerId, locations = [] }
                     </option>
                   ))}
                 </select>
+                {!discoverySession.adAccounts?.length && <p className="text-xs text-amber-700 mt-1">No ad accounts were returned. Check ad account access and ads_read or ads_management permission.</p>}
               </div>
 
               <div className="pt-2 flex justify-end gap-2 border-t">
                 <Button variant="outline" onClick={() => setMetaDiscoveryModal(false)} className="text-xs">
                   Cancel
                 </Button>
-                <Button onClick={handleConfirmMetaSelection} disabled={submitting} className="bg-blue-600 hover:bg-blue-700 text-xs text-white">
+                <Button onClick={handleConfirmMetaSelection} disabled={submitting || !(selectedMetaAssets.facebookPageId || selectedMetaAssets.instagramBusinessAccountId || selectedMetaAssets.metaAdAccountId)} className="bg-blue-600 hover:bg-blue-700 text-xs text-white">
                   {submitting ? "Saving Connections..." : "Confirm & Save Connections"}
                 </Button>
               </div>

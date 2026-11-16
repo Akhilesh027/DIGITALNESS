@@ -91,9 +91,11 @@ exports.getAIStatus = () => {
   const hasAiml = Boolean(process.env.AIML_API_KEY);
   const hasCf = Boolean(process.env.CLOUDFLARE_API_TOKEN && process.env.CLOUDFLARE_ACCOUNT_ID);
   return {
-    status: "AI Providers Ready (AIML API + Cloudflare Workers AI + Pollinations)",
-    textProvider: hasAiml ? "AIML API" : hasCf ? "Cloudflare Workers AI" : "Pollinations Free AI",
-    textModel: process.env.AIML_TEXT_MODEL || "@cf/meta/llama-3.1-8b-instruct",
+    status: "Provider configuration detected; live availability not verified",
+    verified: false,
+    textFallbackOrder: ["Cloudflare Workers AI", "Pollinations", "AIML API"],
+    textProvider: hasCf ? "Cloudflare Workers AI" : "Pollinations",
+    textModel: hasCf ? (process.env.CLOUDFLARE_AI_TEXT_MODEL || "@cf/meta/llama-3.1-8b-instruct") : "openai",
     hasAIML: hasAiml,
     hasCloudflare: hasCf,
     hasOpenAI: Boolean(process.env.OPENAI_API_KEY),
@@ -202,14 +204,7 @@ exports.generateStructured = async ({ prompt, systemPrompt = "", schemaName = "c
   }
 
   // 2. Try Pollinations Free Models (100% Free, Zero Balance Needed)
-  const fullCombinedPrompt = `${systemPrompt}\n\nTask: ${prompt}\n\nYou MUST return either a valid JSON object or labeled sections for:
-visualPrompt: (Photorealistic camera & scene description, Hasselblad 85mm, 3-point lighting, no text)
-headline: (Punchy advertising headline under 6 words)
-subheadline: (Engaging marketing value proposition under 15 words)
-cta: (Action-oriented CTA button text)
-layoutTheme: (gold_luxury / modern_glass / festive_divine / bold_commercial / clinical_teal)
-caption: (Full Instagram post caption with emojis, bullet points, and CTA)
-hashtags: (Comma-separated 8 hashtags)`;
+  const fullCombinedPrompt = `${systemPrompt}\n\nTask: ${prompt}\n\nReturn a valid JSON object matching the requested ${schemaName} structure. Return raw JSON only.`;
 
   const models = ["openai", "mistral", "claude-hybridspace", "search"];
   
@@ -225,7 +220,7 @@ hashtags: (Comma-separated 8 hashtags)`;
         signal: controller.signal,
         body: JSON.stringify({
           messages: [
-            { role: "system", content: systemPrompt },
+            { role: "system", content: `${systemPrompt}\nReturn a valid JSON object matching the requested ${schemaName} structure. Return raw JSON only.` },
             { role: "user", content: prompt },
           ],
           model,
@@ -252,7 +247,7 @@ hashtags: (Comma-separated 8 hashtags)`;
       if (firstBrace !== -1 && lastBrace !== -1) {
         try {
           const parsed = JSON.parse(cleaned.substring(firstBrace, lastBrace + 1));
-          if (parsed && (parsed.visualPrompt || parsed.headline || parsed.prompt || parsed.campaignName)) {
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Object.keys(parsed).length > 0) {
             console.log(`[Pollinations Free Text AI - ${model}] ✓ Live AI Generation Succeeded (JSON)!`);
             return parsed;
           }

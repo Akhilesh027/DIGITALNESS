@@ -1,7 +1,17 @@
 const express = require("express");
 const router = express.Router();
 const AdCampaign = require("../models/AdCampaign");
-const adsHandlers = require("../ai/commands/handlers/adsHandlers");
+const { protect, scopeAds, scopeCampaign } = require('../middleware/adCampaignAccess');
+const { editableUpdates, campaignError } = require('../services/adCampaignPolicy');
+router.use(protect, scopeAds);
+router.use('/campaigns/:id', (req, res, next) => ['scan-performance', 'synthesize', 'create-manual'].includes(req.params.id) ? next() : scopeCampaign(req, res, next));
+router.use('/campaigns/:id', (req, res, next) => {
+  if (['PUT', 'POST'].includes(req.method) && req.adCampaign?.dispatchLockAt) return res.status(409).json({ success: false, error: 'A platform operation is in progress. Refresh before making changes.' });
+  if (['PUT', 'POST'].includes(req.method) && !['dispatch', 'toggle-status'].includes(req.path.split('/').filter(Boolean).pop()) && req.adCampaign?.metaCampaignId) {
+    return res.status(409).json({ success: false, error: 'This blueprint has already been created on Meta. Create a new draft to change its configuration.' });
+  }
+  next();
+});
 
 /**
  * GET /api/ads/campaigns
@@ -10,7 +20,7 @@ const adsHandlers = require("../ai/commands/handlers/adsHandlers");
 router.get("/campaigns", async (req, res) => {
   try {
     const { customerId, status, platform } = req.query;
-    const filter = {};
+    const filter = { ...req.adsFilter };
     if (customerId) filter.customerId = customerId;
     if (status) filter.status = status;
     if (platform) filter.platform = platform;
@@ -23,7 +33,7 @@ router.get("/campaigns", async (req, res) => {
 
     res.json({ success: true, count: campaigns.length, campaigns });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 });
 
@@ -31,13 +41,14 @@ router.get("/campaigns", async (req, res) => {
  * GET / POST /api/ads/campaigns/scan-performance
  * Triggers 24/7 ROAS & CPL Optimization engine scan on-demand
  */
-router.all("/campaigns/scan-performance", async (req, res) => {
+router.post("/campaigns/scan-performance", async (req, res) => {
   try {
     const adWatcher = require("../ai/automation/engines/AdPerformanceWatcherEngine");
-    const result = await adWatcher.scan({ userId: req.user?._id || req.body?.userId });
-    res.json(result);
+    const campaigns = await AdCampaign.find({ ...req.adsFilter, platform: 'Meta', status: { $in: ['Active', 'Live', 'Paused'] } }).lean();
+    const results = await Promise.allSettled(campaigns.map(c => adWatcher.evaluateCampaign({ adCampaignId: c._id, customerId: c.customerId })));
+    res.json({ success: true, scanned: campaigns.length, evaluated: results.filter(r => r.status === 'fulfilled' && ['EVALUATED', 'HEALTHY'].includes(r.value.status)).length, noData: results.filter(r => r.status === 'fulfilled' && ['NO_DATA', 'INSUFFICIENT_DATA'].includes(r.value.status)).length, failed: results.filter(r => r.status === 'rejected').length });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 });
 
@@ -60,7 +71,7 @@ router.get("/campaigns/:id", async (req, res) => {
 
     res.json({ success: true, campaign });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 });
 
@@ -79,14 +90,14 @@ router.post("/campaigns/synthesize", async (req, res) => {
       customer = await Customer.findById(customerId).lean();
     }
 
-    const clientName = customer?.companyName || customer?.name || "Premium Brand Client";
+    const clientName = customer?.name || customer?.companyName || "Premium Brand Client";
     const industry = customer?.businessProfile?.industry || customer?.businessType || customer?.industry || "Commercial Business";
     const services = (customer?.businessProfile?.services || customer?.requirements || ["Flagship Services"]).join(", ");
-    const usp = (customer?.businessProfile?.usp || ["Certified Quality", "Premium Experience"]).join(", ");
+    const usp = (customer?.businessProfile?.usp || ["Customer service", "Personal support"]).join(", ");
     const targetAudience = (customer?.businessProfile?.targetAudience || ["High-intent local customers"]).join(", ");
     const city = targetLocation || customer?.city || "Hyderabad";
-    const phone = (customer?.contactNumbers && customer?.contactNumbers[0]) || customer?.phone || "+91 9876543210";
-    const website = customer?.website || "www.digitalness.agency";
+    const phone = (customer?.contactNumbers && customer?.contactNumbers[0]) || customer?.phone || "";
+    const website = customer?.website || "";
 
     const aiPrompt = `[SYSTEM: ELITE PAID MEDIA PERFORMANCE STRATEGIST & AD ARCHITECT]
 You are architecting an autonomous, high-ROAS paid media advertising campaign blueprint for Meta Ads (Instagram/Facebook) and Google Ads.
@@ -167,8 +178,8 @@ Generate a valid JSON object matching:
       "creativeRequirements": "1080x1080 bold commercial creative with urgent offer badge."
     },
     {
-      "headline": "Rated #1 in ${city} for ${industry}",
-      "primaryText": "🔥 Trusted by 5,000+ satisfied clients. Connect with ${clientName} directly on WhatsApp or book online in 60 seconds.",
+      "headline": "Explore ${industry} in ${city}",
+      "primaryText": "🔥 Discover our services. Connect with ${clientName} directly on WhatsApp or book online in 60 seconds.",
       "callToAction": "Contact Us",
       "format": "Reel / Video",
       "creativeRequirements": "9:16 vertical video showcasing customer testimonial & clinic suite tour."
@@ -198,10 +209,13 @@ Generate a valid JSON object matching:
 
     console.log(`[AdCampaigns] 🤖 Calling AI to synthesize autonomous ad campaign for "${clientName}"...`);
     const aiData = await AIProvider.generateStructured({
-      systemPrompt: "You are an elite paid media architect. Return strictly valid JSON matching the requested campaign schema.",
+      systemPrompt: "You are a paid media planner. Use only supplied client facts. Do not invent certifications, rankings, customer counts, discounts or testimonials. Return strictly valid JSON matching the requested campaign schema.",
       prompt: aiPrompt,
       schemaName: "ad_campaign_blueprint",
     });
+    if (!aiData || !Array.isArray(aiData.adVariants) || !aiData.adVariants.length || !Array.isArray(aiData.audiences) || !aiData.audiences.length) {
+      throw campaignError('AI did not return a valid campaign blueprint. Retry generation or use the manual builder.', 502);
+    }
 
     const campaignId = `CAMP-${clientName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, "X")}-${Date.now().toString(36).toUpperCase()}`;
 
@@ -223,7 +237,7 @@ Generate a valid JSON object matching:
       },
       duration: {
         startDate: new Date(),
-        days: 14,
+        days: Math.max(1, Math.min(365, Number(req.body.duration?.days || req.body.durationDays) || 14)),
       },
       targetLocations: [city],
       promotedServices: services.split(",").map((s) => s.trim()).filter(Boolean),
@@ -253,29 +267,29 @@ Generate a valid JSON object matching:
         prompt: req.body.posterPrompt || `Commercial advertising poster for "${clientName}". Bold 3D gold embossed headline typography reading "${req.body.headline || aiData?.adVariants?.[0]?.headline || 'TRANSFORM YOUR EXCELLENCE'}"`,
       },
       metaSettings: {
-        adAccountId: customer?.adsProfile?.metaAdAccountId || "act_108492048201",
-        pageId: customer?.adsProfile?.facebookPageId || "1009827391",
-        instagramActorId: customer?.adsProfile?.instagramActorId || "@" + clientName.toLowerCase().replace(/[^a-z0-9]/g, ""),
-        pixelId: customer?.adsProfile?.metaPixelId || "99827103829",
-        leadGenFormId: customer?.adsProfile?.leadGenFormId || "FORM_AURA_HIGH_INTENT",
-        destinationUrl: customer?.website ? `${customer.website}?utm_source=meta_ads&utm_medium=cpc&utm_campaign=ai_flight` : "https://digitalness.agency",
+        adAccountId: customer?.adsProfile?.metaAdAccountId || "",
+        pageId: customer?.adsProfile?.facebookPageId || "",
+        instagramActorId: customer?.adsProfile?.instagramActorId || "",
+        pixelId: customer?.adsProfile?.metaPixelId || "",
+        leadGenFormId: customer?.adsProfile?.leadGenFormId || "",
+        destinationUrl: customer?.website ? `${customer.website}?utm_source=meta_ads&utm_medium=cpc&utm_campaign=ai_flight` : "",
         callToAction: objective === "WHATSAPP_MESSAGES" ? "WHATSAPP_MESSAGE" : "LEARN_MORE",
         placement: "ALL_PLACEMENTS",
       },
       googleSettings: {
-        customerAccountId: customer?.adsProfile?.googleCustomerAccountId || "892-109-4820",
-        conversionActionId: "CONV_LEAD_SUBMIT_99",
-        finalUrl: customer?.website || "https://digitalness.agency",
+        customerAccountId: customer?.adsProfile?.googleCustomerAccountId || "",
+        conversionActionId: "",
+        finalUrl: customer?.website || "",
         targetNetwork: "SEARCH_AND_DISPLAY",
       },
       qaAudit: {
-        passed: true,
-        checks: ["Budget within safety limits", "Target location verified", "Ad copy meets advertising policies", "Multi-tier audience populated", "Meta ad account and pixel verified"],
-        warnings: [],
+        passed: false,
+        checks: [],
+        warnings: ["Draft requires account, creative and targeting review before platform creation."],
         checkedAt: new Date(),
       },
       status: "Pending Approval",
-      createdBy: req.user?._id || req.body?.userId || null,
+      createdBy: req.user._id,
     });
 
     const populated = await AdCampaign.findById(newCampaign._id)
@@ -286,7 +300,7 @@ Generate a valid JSON object matching:
     return res.status(201).json({ success: true, campaign: populated });
   } catch (error) {
     console.error("[AdCampaigns Synthesis Error]:", error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(error.statusCode || 500).json({ success: false, error: error.message });
   }
 });
 
@@ -296,6 +310,7 @@ Generate a valid JSON object matching:
  */
 router.post("/campaigns/create-manual", async (req, res) => {
   try {
+    if (!Array.isArray(req.body.adVariants) || !req.body.adVariants.length || req.body.adVariants.some(v => !v.headline?.trim() || !v.primaryText?.trim())) throw campaignError('Add a headline and primary text for each ad variant.');
     const {
       customerId,
       campaignName,
@@ -314,7 +329,7 @@ router.post("/campaigns/create-manual", async (req, res) => {
 
     const Customer = require("../models/Customer");
     const customer = await Customer.findById(customerId).lean();
-    const clientName = customer?.companyName || customer?.name || "Client Brand";
+    const clientName = customer?.name || customer?.companyName || "Client Brand";
     const campaignId = `CAMP-${clientName.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, "X")}-${Date.now().toString(36).toUpperCase()}`;
 
     const newCampaign = await AdCampaign.create({
@@ -335,7 +350,7 @@ router.post("/campaigns/create-manual", async (req, res) => {
       },
       duration: {
         startDate: new Date(),
-        days: 14,
+        days: Math.max(1, Math.min(365, Number(req.body.duration?.days || req.body.durationDays) || 14)),
       },
       targetLocations: Array.isArray(targetLocations) ? targetLocations : [targetLocations],
       promotedServices,
@@ -380,21 +395,21 @@ router.post("/campaigns/create-manual", async (req, res) => {
         theme: creativePosterAsset.theme || "gold_luxury",
       },
       metaSettings: {
-        adAccountId: metaSettings.adAccountId || customer?.adsProfile?.metaAdAccountId || "act_108492048201",
-        pageId: metaSettings.pageId || customer?.adsProfile?.facebookPageId || "1009827391",
-        instagramActorId: metaSettings.instagramActorId || customer?.adsProfile?.instagramActorId || "@" + clientName.toLowerCase().replace(/[^a-z0-9]/g, ""),
-        pixelId: metaSettings.pixelId || customer?.adsProfile?.metaPixelId || "99827103829",
-        leadGenFormId: metaSettings.leadGenFormId || "FORM_MANUAL_LEAD",
-        privacyPolicyUrl: metaSettings.privacyPolicyUrl || customer?.privacyPolicyUrl || (customer?.website ? `${customer.website}/privacy-policy` : "https://digitalness.agency/privacy"),
-        destinationUrl: metaSettings.destinationUrl || customer?.website || "https://digitalness.agency",
+        adAccountId: metaSettings.adAccountId || customer?.adsProfile?.metaAdAccountId || "",
+        pageId: metaSettings.pageId || customer?.adsProfile?.facebookPageId || "",
+        instagramActorId: metaSettings.instagramActorId || customer?.adsProfile?.instagramActorId || "",
+        pixelId: metaSettings.pixelId || customer?.adsProfile?.metaPixelId || "",
+        leadGenFormId: metaSettings.leadGenFormId || "",
+        privacyPolicyUrl: metaSettings.privacyPolicyUrl || customer?.privacyPolicyUrl || (customer?.website ? `${customer.website}/privacy-policy` : ""),
+        destinationUrl: metaSettings.destinationUrl || customer?.website || "",
         callToAction: metaSettings.callToAction || "LEARN_MORE",
         placement: metaSettings.placement || "ALL_PLACEMENTS",
         specialAdCategory: metaSettings.specialAdCategory || req.body.specialAdCategory || "NONE",
       },
       googleSettings: {
-        customerAccountId: googleSettings.customerAccountId || customer?.adsProfile?.googleCustomerAccountId || "892-109-4820",
-        conversionActionId: googleSettings.conversionActionId || "CONV_LEAD_SUBMIT_99",
-        finalUrl: googleSettings.finalUrl || customer?.website || "https://digitalness.agency",
+        customerAccountId: googleSettings.customerAccountId || customer?.adsProfile?.googleCustomerAccountId || "",
+        conversionActionId: googleSettings.conversionActionId || "",
+        finalUrl: googleSettings.finalUrl || customer?.website || "",
         targetNetwork: googleSettings.targetNetwork || "SEARCH_AND_DISPLAY",
         keywords: googleSettings.keywords || (promotedServices.length ? promotedServices : ["luxury services", "top clinic"]),
         negativeKeywords: googleSettings.negativeKeywords || ["free", "cheap", "jobs"],
@@ -402,13 +417,13 @@ router.post("/campaigns/create-manual", async (req, res) => {
         descriptions: googleSettings.descriptions || [adVariants[0]?.primaryText || "Verified quality and premium treatments. Book online today."],
       },
       qaAudit: {
-        passed: true,
-        checks: ["Manual parameters validated", "Target budget within threshold", "Verified advertiser credentials"],
-        warnings: [],
+        passed: false,
+        checks: [],
+        warnings: ["Draft requires account, creative and targeting review before platform creation."],
         checkedAt: new Date(),
       },
       status: "Pending Approval",
-      createdBy: req.user?._id || req.body?.userId || null,
+      createdBy: req.user._id,
     });
 
     const populated = await AdCampaign.findById(newCampaign._id)
@@ -418,7 +433,7 @@ router.post("/campaigns/create-manual", async (req, res) => {
     return res.status(201).json({ success: true, campaign: populated });
   } catch (error) {
     console.error("[Manual AdCampaign Creation Error]:", error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(error.statusCode || 500).json({ success: false, error: error.message });
   }
 });
 
@@ -435,7 +450,7 @@ router.post("/campaigns/:id/generate-poster", async (req, res) => {
 
     if (!campaign) return res.status(404).json({ success: false, error: "Campaign not found" });
 
-    const clientName = campaign.customerId?.companyName || campaign.customerId?.name || "Brand Client";
+    const clientName = campaign.customerId?.name || campaign.customerId?.companyName || "Brand Client";
     const cleanPrompt = prompt || `Commercial graphic advertising poster for "${clientName}". Bold 3D gold embossed headline typography reading "${headline || 'EXCLUSIVE SPECIAL OFFER'}", luxury studio lighting, photorealistic 8k render, professional commercial graphic design layout`;
     const seed = Math.floor(Math.random() * 1000000);
     const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt)}?width=1080&height=1080&model=flux&nologo=true&seed=${seed}`;
@@ -450,11 +465,12 @@ router.post("/campaigns/:id/generate-poster", async (req, res) => {
       theme,
       prompt: cleanPrompt,
     };
-
+    campaign.status = 'Pending Approval';
+    campaign.version += 1;
     await campaign.save();
     return res.json({ success: true, creativePosterAsset: campaign.creativePosterAsset, campaign });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 });
 
@@ -464,10 +480,11 @@ router.post("/campaigns/:id/generate-poster", async (req, res) => {
  */
 router.put("/campaigns/:id", async (req, res) => {
   try {
+    const changes = editableUpdates(req.body);
     const updated = await AdCampaign.findOneAndUpdate(
       { $or: [{ _id: req.params.id.match(/^[0-9a-fA-F]{24}$/) ? req.params.id : null }, { campaignId: req.params.id }] },
-      { $set: req.body, $inc: { version: 1 } },
-      { new: true }
+      { $set: { ...changes, status: 'Pending Approval', qaAudit: { passed: false, checks: [], warnings: ['Blueprint changed; review required.'], checkedAt: new Date() } }, $inc: { version: 1 } },
+      { new: true, runValidators: true }
     )
       .populate("customerId", "name companyName industry city logoUrl")
       .lean();
@@ -475,7 +492,7 @@ router.put("/campaigns/:id", async (req, res) => {
     if (!updated) return res.status(404).json({ success: false, error: "Campaign not found" });
     return res.json({ success: true, campaign: updated });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 });
 
@@ -485,20 +502,9 @@ router.put("/campaigns/:id", async (req, res) => {
  */
 router.post("/campaigns/:id/toggle-status", async (req, res) => {
   try {
-    const campaign = await AdCampaign.findOne({
-      $or: [{ _id: req.params.id.match(/^[0-9a-fA-F]{24}$/) ? req.params.id : null }, { campaignId: req.params.id }],
-    });
-
-    if (!campaign) return res.status(404).json({ success: false, error: "Campaign not found" });
-
-    const isLive = campaign.status === "Active" || campaign.status === "Live";
-    campaign.status = isLive ? "Paused" : "Active";
-    campaign.externalStatus = isLive ? "PAUSED" : "ACTIVE";
-    await campaign.save();
-
-    return res.json({ success: true, status: campaign.status, campaign });
+    return res.json(await require('../services/safeMetaCampaignService').toggleCampaign(req.params.id, req.body));
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 });
 
@@ -515,6 +521,12 @@ router.post("/campaigns/:id/attach-creative", async (req, res) => {
 
     if (!campaign) return res.status(404).json({ success: false, error: "Campaign not found" });
 
+    if (!Number.isInteger(variantIndex) || variantIndex < 0 || !campaign.adVariants?.[variantIndex]) throw campaignError('Select a valid ad variant.');
+    const project = await require('../models/CreativeProject').findOne({ _id: creativeProjectId, customerId: campaign.customerId }).lean();
+    if (!project) throw campaignError('Creative project not found for this customer.', 404);
+    const version = project.versions?.find(v => v.versionNumber === project.currentVersion);
+    if (!version?.fileUrl) throw campaignError('Creative project has no current image file.');
+    if (variantIndex === 0) campaign.creativePosterAsset = { ...(campaign.creativePosterAsset?.toObject?.() || campaign.creativePosterAsset || {}), imageUrl: version.fileUrl, creativeProjectId };
     if (campaign.adVariants && campaign.adVariants[variantIndex]) {
       campaign.adVariants[variantIndex].creativeProjectId = creativeProjectId;
       if (headline) campaign.adVariants[variantIndex].headline = headline;
@@ -525,10 +537,12 @@ router.post("/campaigns/:id/attach-creative", async (req, res) => {
       campaign.creativeRequirements[variantIndex].status = "Approved";
     }
 
+    campaign.status = 'Pending Approval';
+    campaign.version += 1;
     await campaign.save();
-    return res.json({ success: true, message: "Creative attached to ad campaign variant!", campaign });
+    return res.json({ success: true, message: "Creative attached. Review the updated blueprint before approval.", campaign });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 });
 
@@ -545,13 +559,13 @@ router.post("/campaigns/:id/approve", async (req, res) => {
 
     if (!campaign) return res.status(404).json({ success: false, error: "Campaign not found" });
 
+    if (!['Draft', 'Pending Approval', 'Approved'].includes(campaign.status)) throw campaignError('Only a draft awaiting review can be approved.', 409);
     campaign.status = "Approved";
-    campaign.externalStatus = "ACTIVE";
     await campaign.save();
 
-    return res.json({ success: true, message: "Campaign Approved for Live Flight!", campaign });
+    return res.json({ success: true, message: "Blueprint approved. No ads have been created or activated.", campaign });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 });
 
@@ -565,22 +579,14 @@ router.post("/campaigns/:id/dispatch", async (req, res) => {
     const result = await metaAdsDispatchService.dispatchCampaign(req.params.id, req.body);
     return res.json(result);
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, error: err.message });
   }
 });
 
-/**
- * GET / POST /api/ads/campaigns/scan-performance
- * Triggers 24/7 ROAS & CPL Optimization engine scan on-demand
- */
-router.all("/campaigns/scan-performance", async (req, res) => {
+router.get('/campaigns/:id/preflight', async (req, res) => {
   try {
-    const adWatcher = require("../ai/automation/engines/AdPerformanceWatcherEngine");
-    const result = await adWatcher.scan({ userId: req.user?._id || req.body?.userId });
-    return res.json(result);
-  } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
-  }
+    res.json(await require('../services/safeMetaCampaignService').dispatchCampaign(req.params.id, { validateOnly: true }));
+  } catch (error) { res.status(error.statusCode || 500).json({ success: false, error: error.message }); }
 });
 
 module.exports = router;

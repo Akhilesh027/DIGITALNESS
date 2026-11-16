@@ -141,7 +141,8 @@ export function FloatingAICopilot() {
       const response: WorkspaceResponse = await sendWorkspaceMessage({
         conversationId,
         input: {
-          type: isSkip ? "intake_skip" : "intake_answer",
+          type: "intake_answer",
+          isSkip,
           field,
           value,
         },

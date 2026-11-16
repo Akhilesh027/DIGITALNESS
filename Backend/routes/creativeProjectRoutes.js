@@ -14,6 +14,23 @@ const {
 } = require("../controllers/creativeProjectController");
 
 router.use(protect);
+router.use(async (req, res, next) => {
+  try {
+    const studio = require('../ai/creative/OpenAIStudioService');
+    studio.customerFilter(req.user);
+    if (req.method === 'POST' && req.path === '/') await studio.customerForUser(req.body.customerId, req.user);
+    next();
+  } catch (error) { res.status(error.statusCode || 500).json({ success: false, message: error.message }); }
+});
+router.use('/:id', async (req, res, next) => {
+  try {
+    if (!/^[a-f\d]{24}$/i.test(req.params.id)) return res.status(400).json({ success: false, message: 'Invalid creative project ID.' });
+    const project = await require('../models/CreativeProject').findById(req.params.id).select('customerId').lean();
+    if (!project) return res.status(404).json({ success: false, message: 'Creative project not found.' });
+    await require('../ai/creative/OpenAIStudioService').customerForUser(project.customerId, req.user);
+    next();
+  } catch (error) { res.status(error.statusCode || 500).json({ success: false, message: error.message }); }
+});
 
 router.route("/").get(getCreativeProjects).post(createCreativeProject);
 

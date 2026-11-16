@@ -156,12 +156,12 @@ export const AgencyExecutiveDashboard: React.FC = () => {
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
                 <span className="text-slate-400">Content Delivery Rate</span>
-                <span className="font-bold text-emerald-400">{overview?.operationsBarometer?.contentDeliveryRate || 100}%</span>
+                <span className="font-bold text-emerald-400">{overview?.operationsBarometer?.contentDeliveryRate == null ? "Unavailable" : `${overview.operationsBarometer.contentDeliveryRate}%`}</span>
               </div>
               <div className="w-full bg-slate-950 rounded-full h-2">
                 <div
                   className="bg-emerald-500 h-2 rounded-full"
-                  style={{ width: `${overview?.operationsBarometer?.contentDeliveryRate || 100}%` }}
+                  style={{ width: `${Math.min(100, Math.max(0, overview?.operationsBarometer?.contentDeliveryRate ?? 0))}%` }}
                 />
               </div>
             </div>
@@ -169,12 +169,12 @@ export const AgencyExecutiveDashboard: React.FC = () => {
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
                 <span className="text-slate-400">SLA Compliance Rate</span>
-                <span className="font-bold text-indigo-400">{overview?.operationsBarometer?.slaComplianceRate || 100}%</span>
+                <span className="font-bold text-indigo-400">{overview?.operationsBarometer?.slaComplianceRate == null ? "Unavailable" : `${overview.operationsBarometer.slaComplianceRate}%`}</span>
               </div>
               <div className="w-full bg-slate-950 rounded-full h-2">
                 <div
                   className="bg-indigo-500 h-2 rounded-full"
-                  style={{ width: `${overview?.operationsBarometer?.slaComplianceRate || 100}%` }}
+                  style={{ width: `${Math.min(100, Math.max(0, overview?.operationsBarometer?.slaComplianceRate ?? 0))}%` }}
                 />
               </div>
             </div>
@@ -219,10 +219,10 @@ export const AgencyExecutiveDashboard: React.FC = () => {
                           : "bg-rose-950 text-rose-300 border-rose-800"
                       }`}
                     >
-                      {c.healthScore?.score || 100} / 100 ({c.healthScore?.status?.replace("_", " ")})
+                      {c.healthScore?.score == null ? "Unavailable" : `${c.healthScore.score} / 100 (${c.healthScore.status?.replace(/_/g, " ") || "Status unavailable"})`}
                     </span>
                   </td>
-                  <td className="py-3 px-3 text-slate-300">{c.deliveryRate}%</td>
+                  <td className="py-3 px-3 text-slate-300">{c.deliveryRate == null ? "Unavailable" : `${c.deliveryRate}%`}</td>
                   <td className="py-3 px-3 text-slate-300">{formatCurrency(c.metaSpend)}</td>
                   <td className="py-3 px-3 font-semibold text-slate-200">{c.totalLeads}</td>
                   <td className="py-3 px-3 text-right">

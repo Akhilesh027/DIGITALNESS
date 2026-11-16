@@ -16,6 +16,7 @@ const metaConfig = require("../../../config/meta");
 const MetaDiscoverySession = require("../../../models/MetaDiscoverySession");
 const IntegrationManager = require("../IntegrationManager");
 const { encryptToken, decryptToken } = require("../../../utils/cryptoUtil");
+const { fetchMetaCollection } = require('./metaDiscoveryClient');
 
 class MetaOAuthService {
   constructor() {
@@ -263,13 +264,18 @@ class MetaOAuthService {
     }
 
     // Real Graph API discovery
-    const pagesUrl = `https://graph.facebook.com/${metaConfig.graphApiVersion}/me/accounts?fields=id,name,category,tasks,access_token,instagram_business_account{id,username,name}&access_token=${accessToken}`;
-    const adAccountsUrl = `https://graph.facebook.com/${metaConfig.graphApiVersion}/me/adaccounts?fields=id,name,account_status,currency,business&access_token=${accessToken}`;
-
-    const [pagesRes, adsRes] = await Promise.all([
-      fetch(pagesUrl).then((r) => r.json()),
-      fetch(adAccountsUrl).then((r) => r.json()).catch(() => ({ data: [] })),
+    const [pagesResult, adsResult] = await Promise.allSettled([
+      fetchMetaCollection({ edge: 'accounts', fields: 'id,name,category,tasks,access_token,instagram_business_account{id,username,name}', accessToken, version: metaConfig.graphApiVersion }),
+      fetchMetaCollection({ edge: 'adaccounts', fields: 'id,name,account_status,currency', accessToken, version: metaConfig.graphApiVersion }),
     ]);
+    const discoveryWarnings = [];
+    const collection = (result, label) => {
+      if (result.status === 'fulfilled') return result.value;
+      discoveryWarnings.push(`${label} could not be loaded. Reconnect Meta and check the app permissions and your access to these assets.`);
+      return [];
+    };
+    const pagesRes = { data: collection(pagesResult, 'Facebook Pages and linked Instagram accounts') };
+    const adsRes = { data: collection(adsResult, 'Meta ad accounts') };
 
     const pages = (pagesRes.data || []).map((page) => ({
       pageId: page.id,
@@ -290,7 +296,7 @@ class MetaOAuthService {
       businessId: ad.business?.id || null,
     }));
 
-    return { pages, adAccounts };
+    return { pages, adAccounts, discoveryWarnings };
   }
 
   /**
@@ -314,6 +320,7 @@ class MetaOAuthService {
       grantedScopes: scopes || [],
       pages: pagesWithEncryptedTokens,
       adAccounts: assets.adAccounts,
+      discoveryWarnings: assets.discoveryWarnings || [],
       status: "ACTIVE",
       expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 min TTL
     });
@@ -331,6 +338,11 @@ class MetaOAuthService {
     selectedAssets = {},
     actorId = null,
   }) {
+    if (!(selectedAssets.facebookPageId || selectedAssets.instagramBusinessAccountId || selectedAssets.metaAdAccountId)) {
+      const error = new Error('Select at least one discovered Meta account before saving.');
+      error.code = 'META_ASSET_SELECTION_REQUIRED';
+      throw error;
+    }
     const session = await MetaDiscoverySession.findOne({
       sessionId: discoverySessionId,
       status: "ACTIVE",

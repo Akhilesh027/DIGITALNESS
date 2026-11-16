@@ -151,10 +151,11 @@ const customerSchema = new mongoose.Schema(
       validFrom: { type: Date, default: Date.now },
       validUntil: { type: Date, default: null },
       billingFrequency: { type: String, enum: ["Monthly", "Quarterly", "Annual", "Custom"], default: "Monthly" },
-      monthlyAmount: { type: Number, default: 0 },
+      monthlyAmount: { type: Number, default: null },
       servicesIncluded: { type: [String], default: ["Social Media Management", "Performance Ads", "Graphic Design"] },
       gracePeriodDays: { type: Number, default: 3 },
-      autoHoldOnExpiry: { type: Boolean, default: false },
+      autoHoldOnExpiry: { type: Boolean, default: true },
+      renewalRevision: { type: Number, default: 0 },
     },
 
     accessControl: {
@@ -169,7 +170,7 @@ const customerSchema = new mongoose.Schema(
       },
       holdType: {
         type: String,
-        enum: ["PAYMENT_OVERDUE", "RENEWAL_REQUIRED", "MANUAL_HOLD", "NONE"],
+        enum: ["PAYMENT_OVERDUE", "RENEWAL_REQUIRED", "MANUAL_HOLD", "EXPIRY", "NONE"],
         default: "NONE",
       },
     },

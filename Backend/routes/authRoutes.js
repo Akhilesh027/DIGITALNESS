@@ -15,13 +15,14 @@ const {
 
 const { protect } = require("../middleware/authMiddleware.js");
 
+const { requireAdmin } = require('../services/servicePermissions');
 const router = express.Router();
 const User = require("../models/User");
 
-router.post("/register", registerUser);
+router.post("/register", protect, requireAdmin, registerUser);
 router.post("/login", loginUser);
 
-router.get("/check-seed", async (req, res) => {
+router.get("/check-seed", protect, requireAdmin, async (req, res) => {
   try {
     const User = require("../models/User");
     const Customer = require("../models/Customer");
@@ -126,7 +127,7 @@ router.get("/check-seed", async (req, res) => {
   }
 });
 
-router.get("/test-token", async (req, res) => {
+router.get("/test-token", protect, requireAdmin, async (req, res) => {
   try {
     const user = await User.findOne({ email: "admin@digitalness.com" }).select("+password");
     if (!user) return res.json({ error: "No admin user in DB" });
@@ -156,9 +157,9 @@ router.use(protect);
 router.get("/", getUsers);
 router.get("/:id", getUserById);
 router.put("/:id", updateUser);
-router.delete("/:id", deleteUser);
+router.delete("/:id", requireAdmin, deleteUser);
 router.post("/logout", logoutUser);
-router.put("/:id/reset-password", resetUserPassword);
+router.put("/:id/reset-password", requireAdmin, resetUserPassword);
 router.post("/:id/documents", addUserDocument);
 router.delete("/:id/documents/:documentIndex", deleteUserDocument);
 

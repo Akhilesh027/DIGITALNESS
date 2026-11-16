@@ -44,6 +44,7 @@ import {
   Legend,
 } from "recharts";
 
+import ClientReports from "@/components/client-portal/ClientReports";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { toast } from "sonner";
@@ -521,6 +522,8 @@ Completed Works ${completedWorks.length}.
         </div>
       </motion.div>
 
+
+
       <div className="bg-card border rounded-xl p-4 grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="flex items-center gap-2 font-medium">
           <Filter className="w-4 h-4 text-primary" />
@@ -602,6 +605,8 @@ Completed Works ${completedWorks.length}.
           </Button>
         </div>
       </div>
+
+      <ClientReports customerId={customerId === "all" ? "" : customerId} customerName={customers.find(customer => String(customer._id || customer.id) === customerId)?.name || "Client"} />
 
       <div className="bg-muted/40 border rounded-xl p-4 text-sm text-muted-foreground">
         Showing report for <b>{selectedBranchName}</b> and{" "}

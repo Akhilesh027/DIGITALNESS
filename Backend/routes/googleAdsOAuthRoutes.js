@@ -5,6 +5,7 @@
 
 const express = require("express");
 const router = express.Router();
+router.use((req, res, next) => req.path === '/callback' ? next() : require('../middleware/authMiddleware').protect(req, res, next));
 const GoogleAdsDiscoverySession = require("../models/GoogleAdsDiscoverySession");
 const googleAdsOAuthService = require("../ai/integrations/google/GoogleAdsOAuthService");
 

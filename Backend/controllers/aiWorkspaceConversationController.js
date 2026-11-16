@@ -8,6 +8,7 @@ const AIConversation = require("../models/AIConversation");
 
 exports.handleWorkspaceMessage = async (req, res) => {
   try {
+    if (req.client?._id || !req.user?._id) return res.status(403).json({ success: false, message: "Staff account required." });
     const { conversationId, input } = req.body;
     if (!input || (!input.text && !input.type)) {
       return res.status(400).json({ success: false, message: "Input payload is required." });
@@ -29,14 +30,15 @@ exports.handleWorkspaceMessage = async (req, res) => {
     });
   } catch (err) {
     console.error("[aiWorkspaceConversationController Error]:", err);
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, message: err.message });
   }
 };
 
 exports.getConversations = async (req, res) => {
   try {
+    if (req.client?._id || !req.user?._id) return res.status(403).json({ success: false, message: "Staff account required." });
     const userId = req.user?._id || req.user?.id;
-    const filter = userId ? { userId } : {};
+    const filter = { userId };
     const list = await AIConversation.find(filter)
       .select("conversationId title state activeCustomerName updatedAt createdAt")
       .sort({ updatedAt: -1 })
@@ -48,14 +50,15 @@ exports.getConversations = async (req, res) => {
       data: list,
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, message: err.message });
   }
 };
 
 exports.getConversationById = async (req, res) => {
   try {
+    if (req.client?._id || !req.user?._id) return res.status(403).json({ success: false, message: "Staff account required." });
     const { conversationId } = req.params;
-    const conv = await AIConversation.findOne({ conversationId }).lean();
+    const conv = await AIConversation.findOne({ conversationId, userId: req.user._id }).lean();
     if (!conv) {
       return res.status(404).json({ success: false, message: "Conversation not found." });
     }
@@ -64,16 +67,19 @@ exports.getConversationById = async (req, res) => {
       data: conv,
     });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, message: err.message });
   }
 };
 
 exports.deleteConversation = async (req, res) => {
   try {
+    if (req.client?._id || !req.user?._id) return res.status(403).json({ success: false, message: "Staff account required." });
     const { conversationId } = req.params;
-    await AIConversation.deleteOne({ conversationId });
+    const deleted = await AIConversation.deleteOne({ conversationId, userId: req.user._id });
+    if (!deleted.deletedCount) return res.status(404).json({ success: false, message: "Conversation not found." });
     return res.status(200).json({ success: true, message: "Conversation deleted." });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    return res.status(err.statusCode || 500).json({ success: false, message: err.message });
   }
 };
+

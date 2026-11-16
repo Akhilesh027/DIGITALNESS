@@ -61,9 +61,11 @@ import {
   scanAdCampaignPerformance,
   attachCreativeToAdCampaign,
   dispatchAdCampaign,
+  preflightAdCampaign,
   updateAdCampaign,
 } from "@/api/adCampaignApi";
 import { getCustomers } from "@/api/customerApi";
+import { getMarketingConnections, MarketingConnectionItem } from '@/api/marketingConnectionApi';
 import { getCreativeProjects, synthesizeAICreativePrompt } from "@/api/creativeProjectApi";
 import { CreativePosterCanvas } from "@/components/ai/creative/CreativePosterCanvas";
 
@@ -72,6 +74,16 @@ export default function AdCampaignsPage() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [creativeProjects, setCreativeProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [search, setSearch] = useState("");
+  const [customerFilter, setCustomerFilter] = useState("all");
+  const [activationCampaign, setActivationCampaign] = useState<any | null>(null);
+  const [connectedAccounts, setConnectedAccounts] = useState<MarketingConnectionItem[]>([]);
+  const [connectionOwnerId, setConnectionOwnerId] = useState('');
+  const [connectionError, setConnectionError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [preflightMessage, setPreflightMessage] = useState("");
+  const [checkingPreflight, setCheckingPreflight] = useState(false);
   const [activeTab, setActiveTab] = useState("all");
   const [selectedCampaign, setSelectedCampaign] = useState<any | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -86,24 +98,31 @@ export default function AdCampaignsPage() {
     if (!selectedCampaign) return;
     try {
       setIsSavingInspector(true);
+      setActionError("");
       const campaignId = selectedCampaign._id || selectedCampaign.campaignId;
       const res = await updateAdCampaign(campaignId, {
+        campaignName: selectedCampaign.campaignName,
+        objective: selectedCampaign.objective,
+        budget: selectedCampaign.budget,
+        duration: selectedCampaign.duration,
+        targetLocations: selectedCampaign.targetLocations,
         adVariants: selectedCampaign.adVariants,
         audiences: selectedCampaign.audiences,
         metaSettings: selectedCampaign.metaSettings,
         googleSettings: selectedCampaign.googleSettings,
         specialAdCategory: selectedCampaign.specialAdCategory,
         creativePosterAsset: selectedCampaign.creativePosterAsset,
-        qaAudit: selectedCampaign.qaAudit,
       });
 
       if (res.success) {
-        toast.success("✅ All Blueprint inputs & settings successfully saved to database!");
+        toast.success("Blueprint saved. Review and approve the updated version.");
+        setSelectedCampaign(res.campaign);
         await loadData();
       } else {
         toast.error(res.error || "Failed to save blueprint changes");
       }
     } catch (err: any) {
+      setActionError(err.message || 'Could not save blueprint.');
       toast.error(err.message || "Failed to update campaign blueprint");
     } finally {
       setIsSavingInspector(false);
@@ -114,23 +133,17 @@ export default function AdCampaignsPage() {
   const handleDispatch = async (campaignId: string) => {
     try {
       setDispatchingId(campaignId);
+      setActionError("");
       const res = await dispatchAdCampaign(campaignId);
       if (res.success) {
-        toast.success(`🚀 Campaign launched LIVE to ${res.dispatchMode || 'Meta Ads'}! (Platform ID: ${res.platformCampaignId || 'act_meta_live'})`);
+        toast.success("Campaign created on Meta in Paused state. No delivery has started.");
         await loadData();
-        if (selectedCampaign?.campaignId === campaignId || selectedCampaign?._id === campaignId) {
-          setSelectedCampaign((prev: any) => (prev ? {
-            ...prev,
-            status: "Active",
-            platformStatus: "RUNNING",
-            platformCampaignId: res.platformCampaignId,
-            externalStatus: "ACTIVE",
-          } : null));
-        }
+        if (selectedCampaign?.campaignId === campaignId || selectedCampaign?._id === campaignId) setSelectedCampaign(res.campaign);
       } else {
         toast.error(res.error || "Failed to dispatch campaign to live ad platform");
       }
     } catch (err: any) {
+      setActionError(err.message || 'Platform creation failed.');
       toast.error(err.message || "Live deployment failed");
     } finally {
       setDispatchingId(null);
@@ -141,15 +154,17 @@ export default function AdCampaignsPage() {
   const handleApprove = async (campaignId: string) => {
     try {
       setApprovingId(campaignId);
+      setActionError("");
       const data = await approveAdCampaign(campaignId);
       if (data.success) {
-        toast.success("Campaign approved! Deploying live to Meta/Google API...");
-        // Auto-trigger live platform dispatch
-        await handleDispatch(campaignId);
+        toast.success("Blueprint approved. Platform creation is a separate step.");
+        await loadData();
+        if (selectedCampaign?.campaignId === campaignId || selectedCampaign?._id === campaignId) setSelectedCampaign(data.campaign);
       } else {
         toast.error(data.error || "Approval failed");
       }
     } catch (err: any) {
+      setActionError(err.message || 'Approval failed.');
       toast.error(err.message || "Approval failed");
     } finally {
       setApprovingId(null);
@@ -157,15 +172,20 @@ export default function AdCampaignsPage() {
   };
 
   // Toggle Live / Paused Status Handler
-  const handleToggleStatus = async (campaignId: string) => {
+  const handleToggleStatus = async (campaignId: string, confirmActivation = false) => {
+    const campaign = campaigns.find(c => c.campaignId === campaignId || c._id === campaignId);
+    if (campaign && !["Active", "Live"].includes(campaign.status) && !confirmActivation) {
+      setActivationCampaign(campaign);
+      return;
+    }
     try {
       setTogglingId(campaignId);
-      const data = await toggleAdCampaignStatus(campaignId);
+      const data = await toggleAdCampaignStatus(campaignId, confirmActivation);
       if (data.success) {
         toast.success(`Campaign status updated to ${data.status}!`);
         await loadData();
         if (selectedCampaign?.campaignId === campaignId) {
-          setSelectedCampaign((prev: any) => (prev ? { ...prev, status: data.status } : null));
+          setSelectedCampaign(data.campaign);
         }
       }
     } catch (err: any) {
@@ -208,12 +228,12 @@ export default function AdCampaignsPage() {
   const [manualPlatform, setManualPlatform] = useState("Meta");
   const [manualDailyBudget, setManualDailyBudget] = useState(2000);
   const [manualDurationDays, setManualDurationDays] = useState(14);
-  const [manualLocations, setManualLocations] = useState("Hyderabad Metro, Jubilee Hills, Gachibowli");
+  const [manualLocations, setManualLocations] = useState("");
   const [manualGender, setManualGender] = useState("All");
   const [manualAgeMin, setManualAgeMin] = useState(22);
   const [manualAgeMax, setManualAgeMax] = useState(52);
-  const [manualOffer, setManualOffer] = useState("25% OFF Limited Time Offer");
-  const [manualInterests, setManualInterests] = useState("Luxury Care, Aesthetics, Premium Lifestyle");
+  const [manualOffer, setManualOffer] = useState("");
+  const [manualInterests, setManualInterests] = useState("");
   const [manualHeadline, setManualHeadline] = useState("");
   const [manualPrimaryText, setManualPrimaryText] = useState("");
   const [manualCta, setManualCta] = useState("Book Now");
@@ -238,9 +258,9 @@ export default function AdCampaignsPage() {
   // Google Ads Responsive Search & Keywords
   const [manualGoogleKeywords, setManualGoogleKeywords] = useState("");
   const [manualGoogleNegativeKeywords, setManualGoogleNegativeKeywords] = useState("free, cheap, jobs, course, salary");
-  const [manualGoogleHeadline2, setManualGoogleHeadline2] = useState("Top Rated Specialists");
-  const [manualGoogleHeadline3, setManualGoogleHeadline3] = useState("Verified Doctor Consultations");
-  const [manualGoogleDescription2, setManualGoogleDescription2] = useState("Book online today for personalized treatments & transparent pricing.");
+  const [manualGoogleHeadline2, setManualGoogleHeadline2] = useState("");
+  const [manualGoogleHeadline3, setManualGoogleHeadline3] = useState("");
+  const [manualGoogleDescription2, setManualGoogleDescription2] = useState("");
 
   const [isManualCreating, setIsManualCreating] = useState(false);
 
@@ -253,15 +273,20 @@ export default function AdCampaignsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [campList, custList, projList] = await Promise.all([
+      setLoadError("");
+      const [campResult, custResult, projResult] = await Promise.allSettled([
         fetchAdCampaigns(),
         getCustomers(),
         getCreativeProjects(),
       ]);
-      setCampaigns(campList || []);
-      setCustomers(custList || []);
-      setCreativeProjects(projList || []);
-    } catch (err) {
+      if (campResult.status === 'rejected') throw campResult.reason;
+      setCampaigns(campResult.value || []);
+      if (custResult.status === 'fulfilled') setCustomers(custResult.value || []);
+      else toast.error('Customers could not be loaded. Retry before creating a campaign.');
+      if (projResult.status === 'fulfilled') setCreativeProjects(projResult.value || []);
+      else toast.error('Creative library unavailable. Campaigns are still accessible.');
+    } catch (err: any) {
+      setLoadError(err.message || 'Campaigns could not be loaded.');
       console.error("Failed to load ads OS data:", err);
       toast.error("Failed to load ad campaigns");
     } finally {
@@ -272,26 +297,45 @@ export default function AdCampaignsPage() {
   useEffect(() => {
     loadData();
   }, []);
+  useEffect(() => { setPreflightMessage(''); }, [selectedCampaign]);
+  const connectionCustomerId = selectedCampaign?.customerId?._id || selectedCampaign?.customerId || (creatorMode === 'MANUAL' ? manualCustomerId : aiCustomerId);
+  useEffect(() => {
+    let current = true;
+    setConnectedAccounts([]);
+    setConnectionOwnerId('');
+    setConnectionError("");
+    if (connectionCustomerId) getMarketingConnections(connectionCustomerId).then(accounts => {
+      if (current) { setConnectedAccounts(accounts.filter(a => ['CONNECTED', 'Connected'].includes(a.status))); setConnectionOwnerId(connectionCustomerId); }
+    }).catch(() => { if (current) setConnectionError('Could not load customer connections.'); });
+    return () => { current = false; };
+  }, [connectionCustomerId]);
+  useEffect(() => {
+    if (!isCreateModalOpen || creatorMode !== 'MANUAL' || selectedCampaign || !manualCustomerId || connectionOwnerId !== manualCustomerId) return;
+    const single = (kind: string) => { const matches = connectedAccounts.filter(a => a.accountType === kind); return matches.length === 1 ? matches[0].platformAccountId : ''; };
+    setManualAdAccountId(prev => prev || single('MetaAdAccount'));
+    setManualPageId(prev => prev || single('FacebookPage'));
+    setManualInstagramActorId(prev => prev || single('InstagramBusiness'));
+  }, [connectedAccounts, connectionOwnerId, manualCustomerId, isCreateModalOpen, creatorMode, selectedCampaign]);
 
   // When a customer is picked in Manual Mode, auto-fill verified CRM details
   const handleManualCustomerChange = (custId: string) => {
     setManualCustomerId(custId);
     const client = customers.find((c) => c._id === custId);
     if (client) {
-      const name = client.companyName || client.name || "Client";
+      const name = client.name || client.companyName || "Client";
       const sanitizedHandle = "@" + name.toLowerCase().replace(/[^a-z0-9]/g, "");
-      setManualCampaignName(`${name} - High ROAS Performance Flight`);
-      setManualLocations(client.city ? `${client.city} Metro Area (15km radius)` : "Hyderabad");
-      setManualAdAccountId(client.adsProfile?.metaAdAccountId || "act_108492048201");
-      setManualPageId(client.adsProfile?.facebookPageId || "1009827391");
-      setManualInstagramActorId(client.adsProfile?.instagramActorId || sanitizedHandle);
-      setManualPixelId(client.adsProfile?.metaPixelId || "99827103829");
-      setManualFormId(client.adsProfile?.leadGenFormId || "FORM_HIGH_INTENT_LEADS");
-      setManualDestUrl(client.website ? `${client.website}?utm_source=meta_ads&utm_medium=paid&utm_campaign=flight_v1` : "https://digitalness.agency");
-      setManualPrivacyPolicyUrl(client.privacyPolicyUrl || (client.website ? `${client.website}/privacy-policy` : "https://digitalness.agency/privacy"));
-      setManualHeadline(`Discover Premium Excellence with ${name}`);
-      setManualPrimaryText(`✨ Experience verified quality and signature treatments with ${name}. Book your private consultation today in ${client.city || 'Hyderabad'}!`);
-      const services = client.businessProfile?.services || ["Exclusive Care", "Premium Services"];
+      setManualCampaignName(`${name} - Campaign Draft`);
+      setManualLocations(client.city || "");
+      setManualAdAccountId(client.adsProfile?.metaAdAccountId || "");
+      setManualPageId(client.adsProfile?.facebookPageId || "");
+      setManualInstagramActorId(client.adsProfile?.instagramActorId || "");
+      setManualPixelId(client.adsProfile?.metaPixelId || "");
+      setManualFormId(client.adsProfile?.leadGenFormId || "");
+      setManualDestUrl(client.website ? `${client.website}?utm_source=meta_ads&utm_medium=paid&utm_campaign=flight_v1` : "");
+      setManualPrivacyPolicyUrl(client.privacyPolicyUrl || (client.website ? `${client.website}/privacy-policy` : ""));
+      setManualHeadline(`Explore ${name}`);
+      setManualPrimaryText(`Explore services from ${name}${client.city ? ` in ${client.city}` : ""}. Contact us to learn more.`);
+      const services = client.businessProfile?.services || [];
       setManualInterests(services.join(", "));
       setManualGoogleKeywords(services.map((s: string) => `"${s}"`).join(", "));
     }
@@ -315,7 +359,7 @@ export default function AdCampaignsPage() {
       if (res.data) {
         setAiBrief(res.data);
         const client = customers.find((c) => c._id === aiCustomerId);
-        const clientName = client?.companyName || client?.name || "Client Brand";
+        const clientName = client?.name || client?.companyName || "Client Brand";
         const defaultPrompt = res.data.finalPrompt || `Commercial advertising poster for "${clientName}". Bold 3D gold embossed headline typography reading '${res.data.headline || "REVEAL FLAWLESS EXCELLENCE"}', featuring signature treatments with cinematic studio lighting, photorealistic 8k render, luxury aesthetic styling`;
         setAiEditedPrompt(defaultPrompt);
         setAiEditedHeadline(res.data.headline || `Exclusive Excellence with ${clientName}`);
@@ -385,7 +429,7 @@ export default function AdCampaignsPage() {
         customPrompt: selectedCampaign.promotedOffer || undefined,
       });
       if (res.data) {
-        const clientName = selectedCampaign.customerId?.companyName || selectedCampaign.customerId?.name || "Brand";
+        const clientName = selectedCampaign.customerId?.name || selectedCampaign.customerId?.companyName || "Brand";
         const prompt = res.data.finalPrompt || `Commercial graphic advertising poster for "${clientName}". Bold 3D gold embossed headline typography reading '${res.data.headline || selectedCampaign.adVariants?.[0]?.headline || "DISCOVER EXCELLENCE"}', signature aesthetic styling, ultra-sharp 8k resolution studio product photography, elegant warm cinematic saffron gold ambient lighting, professional advertising poster layout.`;
         setReGenPrompt(prompt);
         toast.success("✨ Visual Prompt Synthesized from Client 360! Review and click Render.");
@@ -502,7 +546,7 @@ export default function AdCampaignsPage() {
       });
 
       if (res.success && res.campaign) {
-        toast.success("🎨 New AI Ad Poster rendered and attached successfully!");
+        toast.success("🎨 New image preview URL attached. Review it before approval.");
         setSelectedCampaign(res.campaign);
         await loadData();
         setReGenPrompt("");
@@ -521,7 +565,7 @@ export default function AdCampaignsPage() {
       setIsScanning(true);
       const res = await scanAdCampaignPerformance();
       setScanResult(res);
-      toast.success("24/7 ROAS & CPL Optimization scan completed!");
+      toast.success("Performance review completed.");
     } catch (err: any) {
       toast.error("Failed to run optimization scan");
     } finally {
@@ -530,9 +574,11 @@ export default function AdCampaignsPage() {
   };
 
   const filteredCampaigns = campaigns.filter((c) => {
+    if (customerFilter !== 'all' && String(c.customerId?._id || c.customerId) !== customerFilter) return false;
+    if (search && !`${c.campaignName} ${c.campaignId} ${c.customerId?.name || ''} ${c.customerId?.companyName || ''}`.toLowerCase().includes(search.toLowerCase())) return false;
     if (activeTab === "all") return true;
     if (activeTab === "pending") return c.status === "Pending Approval";
-    if (activeTab === "approved") return c.status === "Approved" || c.status === "Active" || c.status === "Live";
+    if (activeTab === "approved") return ["Approved", "Paused", "Active", "Live"].includes(c.status);
     if (activeTab === "meta") return c.platform === "Meta" || c.platform === "Omnichannel";
     if (activeTab === "google") return c.platform === "Google" || c.platform === "Omnichannel";
     return true;
@@ -540,10 +586,22 @@ export default function AdCampaignsPage() {
 
   const totalDailySpend = campaigns.reduce((acc, c) => acc + (c.budget?.amount || 0), 0);
   const pendingCount = campaigns.filter((c) => c.status === "Pending Approval").length;
-  const approvedCount = campaigns.filter((c) => c.status === "Approved" || c.status === "Active" || c.status === "Live").length;
+  const approvedCount = campaigns.filter((c) => ["Approved", "Paused", "Active", "Live"].includes(c.status)).length;
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+      <p className="text-sm text-muted-foreground">Meta creation supports single-image lead and traffic campaigns. Google and Omnichannel campaigns are available as planning drafts.</p>
+      {loadError && <div role="alert" className="p-4 rounded-lg border border-destructive text-destructive flex items-center justify-between gap-3"><span>{loadError}</span><Button variant="outline" onClick={loadData}>Retry</Button></div>}
+      {actionError && <p role="alert" className="text-sm text-destructive">{actionError}</p>}
+      <Dialog open={!!activationCampaign} onOpenChange={open => { if (!open) setActivationCampaign(null); }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Activate campaign delivery?</DialogTitle><DialogDescription>Activation allows Meta to deliver ads and spend the campaign budget.</DialogDescription></DialogHeader>
+          <p className="font-medium">{activationCampaign?.campaignName}</p>
+          <p>Daily budget: {activationCampaign?.budget?.currency || 'INR'} {Number(activationCampaign?.budget?.amount || 0).toLocaleString('en-IN')}</p>
+          <p className="text-sm text-muted-foreground">Ad account: {activationCampaign?.metaSettings?.adAccountId || 'Connected customer account'} · Duration: {activationCampaign?.duration?.days || 14} days</p>
+          <DialogFooter><Button variant="outline" onClick={() => setActivationCampaign(null)}>Cancel</Button><Button onClick={async () => { const id = activationCampaign.campaignId || activationCampaign._id; setActivationCampaign(null); await handleToggleStatus(id, true); }}>Confirm activation</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/40 pb-5">
         <div>
@@ -553,13 +611,13 @@ export default function AdCampaignsPage() {
             </div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
-                Ad Campaigns & Performance OS
+                Ad Campaigns
                 <Badge variant="outline" className="bg-indigo-500/10 text-indigo-400 border-indigo-500/30 text-[10px] uppercase font-bold">
-                  ⚡ Autonomous AI Agent & Manual Builder
+                  Campaign workspace
                 </Badge>
               </h1>
               <p className="text-sm text-muted-foreground">
-                Dual AI Autopilot & Manual Flight Builder, 1080×1080 AI Ad Poster generation, audience segmentation, and live Meta/Google API sync.
+                Build and review campaign blueprints. Create approved Meta campaigns paused, then activate after reviewing the budget.
               </p>
             </div>
           </div>
@@ -579,7 +637,7 @@ export default function AdCampaignsPage() {
             className="gap-1.5 border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 shadow-xs"
           >
             <BarChart3 className={`w-3.5 h-3.5 ${isScanning ? "animate-spin" : ""}`} />
-            Run 24/7 ROAS Scan
+            Review Performance
           </Button>
 
           <Button
@@ -591,7 +649,7 @@ export default function AdCampaignsPage() {
             className="gap-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-md shadow-indigo-500/20 font-medium"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Launch Ad Campaign (AI / Manual)
+            Create Campaign
           </Button>
         </div>
       </div>
@@ -606,9 +664,9 @@ export default function AdCampaignsPage() {
                   <Zap className="w-5 h-5" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-sm text-indigo-200">24/7 Autonomous ROAS & CPL Optimization Engine Active</h4>
+                  <h4 className="font-semibold text-sm text-indigo-200">Performance review</h4>
                   <p className="text-xs text-indigo-300/80 mt-0.5">
-                    Analyzed active campaign flights • Target CPL guardrails enforced • Zero ad spend leakage detected.
+                    {scanResult.scanned} campaigns reviewed · {scanResult.noData} need more data · {scanResult.failed} could not be reviewed.
                   </p>
                 </div>
               </div>
@@ -642,7 +700,7 @@ export default function AdCampaignsPage() {
             <div>
               <p className="text-xs text-muted-foreground font-medium">Daily Ad Spend Allocation</p>
               <h3 className="text-2xl font-bold text-foreground mt-0.5">₹{totalDailySpend.toLocaleString("en-IN")}</h3>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Across active client flights</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Planned daily budget across all drafts</p>
             </div>
             <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
               <IndianRupee className="w-5 h-5" />
@@ -666,9 +724,9 @@ export default function AdCampaignsPage() {
         <Card className="bg-card/50 backdrop-blur-xs border-border/60 shadow-xs">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-medium">Approved & In Flight</p>
+              <p className="text-xs text-muted-foreground font-medium">Approved & Active</p>
               <h3 className="text-2xl font-bold text-emerald-400 mt-0.5">{approvedCount}</h3>
-              <p className="text-[11px] text-emerald-500 font-medium mt-0.5">Live Creative Agent linked</p>
+              <p className="text-[11px] text-emerald-500 font-medium mt-0.5">Approved blueprints and active campaigns</p>
             </div>
             <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <CheckCircle2 className="w-5 h-5" />
@@ -678,6 +736,10 @@ export default function AdCampaignsPage() {
       </div>
 
       {/* FILTER TABS & CAMPAIGNS GRID */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Input aria-label="Search campaigns" placeholder="Search campaign or customer…" value={search} onChange={e => setSearch(e.target.value)} />
+        <Select value={customerFilter} onValueChange={setCustomerFilter}><SelectTrigger className="sm:w-64" aria-label="Filter by customer"><SelectValue placeholder="All customers" /></SelectTrigger><SelectContent><SelectItem value="all">All customers</SelectItem>{customers.map(c => <SelectItem key={c._id} value={c._id}>{c.name || c.companyName}</SelectItem>)}</SelectContent></Select>
+      </div>
       <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <TabsList className="bg-muted/60 border border-border/40 p-1">
@@ -737,7 +799,7 @@ export default function AdCampaignsPage() {
                             subheadline={c.creativePosterAsset.subheadline || c.adVariants?.[0]?.primaryText}
                             offerText={c.creativePosterAsset.offerBadge || c.promotedOffer}
                             ctaText={c.creativePosterAsset.ctaText || c.adVariants?.[0]?.callToAction || "Book Now"}
-                            brandName={c.customerId?.companyName || c.customerId?.name || "Client Brand"}
+                            brandName={c.customerId?.name || c.customerId?.companyName || "Client Brand"}
                             logoUrl={c.customerId?.logoUrl || c.customerId?.brandProfile?.logoUrl || c.creativePosterAsset?.brandLogoUrl}
                             phone={(c.customerId?.contactNumbers && c.customerId?.contactNumbers[0]) || c.customerId?.phone}
                             website={c.customerId?.website}
@@ -748,7 +810,7 @@ export default function AdCampaignsPage() {
                           />
                           <div className="absolute top-2 right-2 z-10 flex items-center gap-1">
                             <Badge className="bg-black/70 backdrop-blur-md text-emerald-400 border border-emerald-500/30 text-[9px] px-1.5 py-0 shadow-xs font-mono">
-                              🎨 1080×1080 Live Canvas
+                              🎨 Creative preview
                             </Badge>
                           </div>
                         </div>
@@ -773,7 +835,7 @@ export default function AdCampaignsPage() {
                               {c.campaignName}
                             </h3>
                             <p className="text-xs text-muted-foreground">
-                              {c.customerId?.companyName || c.customerId?.name || "Client Account"} {c.clientLocationId ? `• ${c.clientLocationId.name}` : ""}
+                              {c.customerId?.name || c.customerId?.companyName || "Client Account"} {c.clientLocationId ? `• ${c.clientLocationId.name}` : ""}
                             </p>
                           </div>
                           <Badge variant="secondary" className="text-[10px] font-medium uppercase shrink-0">
@@ -808,7 +870,7 @@ export default function AdCampaignsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setSelectedCampaign(c)}
+                            onClick={() => { setActionError(''); setSelectedCampaign(c); }}
                             className="text-xs h-7 px-2 text-muted-foreground hover:text-foreground"
                           >
                             Inspect & Edit Blueprint
@@ -823,7 +885,7 @@ export default function AdCampaignsPage() {
                                 className="text-xs h-7 px-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-medium shadow-xs gap-1"
                               >
                                 <Zap className="w-3 h-3" />
-                                {approvingId === c.campaignId || dispatchingId === c.campaignId ? "Deploying Live..." : "Approve & Launch Live"}
+                                {approvingId === c.campaignId || dispatchingId === c.campaignId ? "Creating on Meta..." : "Approve Blueprint"}
                               </Button>
                             ) : (
                               <>
@@ -831,7 +893,7 @@ export default function AdCampaignsPage() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => handleToggleStatus(c.campaignId)}
-                                  disabled={togglingId === c.campaignId}
+                                  disabled={togglingId === c.campaignId || !c.metaCampaignId || c.syncStatus !== "SYNCED"}
                                   className="text-xs h-7 px-2 text-slate-300 hover:text-white border-border/60 gap-1"
                                 >
                                   {isLive ? <Pause className="w-3 h-3 text-amber-400" /> : <Play className="w-3 h-3 text-emerald-400" />}
@@ -840,12 +902,12 @@ export default function AdCampaignsPage() {
                                 <Button
                                   size="sm"
                                   onClick={() => handleDispatch(c.campaignId)}
-                                  disabled={dispatchingId === c.campaignId}
+                                disabled={dispatchingId === c.campaignId || c.syncStatus === 'SYNCED' || c.status !== "Approved" || c.platform !== "Meta"}
                                   className="text-xs h-7 px-2 bg-indigo-600/90 hover:bg-indigo-500 text-white gap-1 shadow-xs font-medium"
-                                  title="Deploy to Meta/Google Live API"
+                                  title="Create on Meta with delivery paused"
                                 >
                                   <Send className="w-3 h-3" />
-                                  {dispatchingId === c.campaignId ? "Deploying..." : "Launch Live"}
+                                  {dispatchingId === c.campaignId ? "Deploying..." : "Create on Meta (paused)"}
                                 </Button>
                               </>
                             )}
@@ -873,7 +935,7 @@ export default function AdCampaignsPage() {
                 <div>
                   <DialogTitle className="text-lg font-bold">New Advertising Campaign Flight</DialogTitle>
                   <DialogDescription>
-                    Choose between 1-Click AI Autopilot or Custom Manual Performance Builder.
+                    Create an AI-assisted draft or build your campaign manually.
                   </DialogDescription>
                 </div>
               </div>
@@ -926,7 +988,7 @@ export default function AdCampaignsPage() {
                       <SelectContent>
                         {customers.map((c) => (
                           <SelectItem key={c._id} value={c._id}>
-                            {c.companyName || c.name} • {c.businessProfile?.industry || c.industry || "General"} ({c.city || "Hyderabad"})
+                            {c.name || c.companyName} • {c.businessProfile?.industry || c.industry || "General"} ({c.city || "Hyderabad"})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -938,6 +1000,7 @@ export default function AdCampaignsPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
                       {[
                         { id: "LEAD_GENERATION", label: "Lead Gen", desc: "Instant Forms & CRM Leads", icon: "🎯" },
+                        { id: "TRAFFIC", label: "Website traffic", desc: "Visits to your website", icon: "🌐" },
                         { id: "WHATSAPP_MESSAGES", label: "WhatsApp", desc: "Direct Chat Inquiries", icon: "💬" },
                         { id: "SALES_CONVERSIONS", label: "Purchases", desc: "High ROAS Conversions", icon: "💎" },
                         { id: "BRAND_AWARENESS", label: "Awareness", desc: "Local Reach & Video Views", icon: "📢" },
@@ -1000,7 +1063,7 @@ export default function AdCampaignsPage() {
                         className="text-xs mt-1.5"
                       />
                       <div className="text-[10px] text-emerald-400 mt-1">
-                        Est. Leads: ~{Math.round((aiDailyBudget * 30) / 220)} Leads / Mo (at ₹180-₹280 CPL)
+                        Budget allocation only. Lead forecasts require real performance data.
                       </div>
                     </div>
 
@@ -1233,7 +1296,7 @@ export default function AdCampaignsPage() {
                     <SelectContent>
                       {customers.map((c) => (
                         <SelectItem key={c._id} value={c._id}>
-                          {c.companyName || c.name} ({c.city || "Hyderabad"})
+                          {c.name || c.companyName} ({c.city || "Hyderabad"})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -1258,10 +1321,14 @@ export default function AdCampaignsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="Meta">Meta Ads (Instagram & FB)</SelectItem>
-                        <SelectItem value="Google">Google Ads (Search & Display)</SelectItem>
-                        <SelectItem value="Omnichannel">Omnichannel (Meta + Google)</SelectItem>
+                        <SelectItem value="Google">Google Ads (planning draft)</SelectItem>
+                        <SelectItem value="Omnichannel">Omnichannel (planning draft)</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">Campaign objective</Label>
+                    <Select value={manualObjective} onValueChange={setManualObjective}><SelectTrigger aria-label="Manual campaign objective" className="mt-0.5 text-xs"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="LEAD_GENERATION">Lead generation</SelectItem><SelectItem value="TRAFFIC">Website traffic</SelectItem></SelectContent></Select>
                   </div>
                 </div>
 
@@ -1488,7 +1555,7 @@ export default function AdCampaignsPage() {
                 </div>
 
                 <div>
-                  <Label className="text-[10px] text-indigo-200">AI Poster Prompt for Flux AI (Auto-Renders 1080×1080 Visual)</Label>
+                  <Label className="text-[10px] text-indigo-200">AI image preview prompt (review generated output before use)</Label>
                   <Textarea
                     rows={2}
                     value={manualPosterPrompt}
@@ -1578,7 +1645,7 @@ export default function AdCampaignsPage() {
                 </div>
               )}
 
-              {/* 6. Verified Meta / Google Credentials */}
+              {/* 6. Meta / Google Account Settings */}
               <div className="p-3.5 rounded-xl bg-muted/40 border border-border/60 space-y-3">
                 <Label className="text-xs font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Settings className="w-3.5 h-3.5 text-emerald-400" /> 6. Live Platform Dispatch Credentials
@@ -1603,11 +1670,11 @@ export default function AdCampaignsPage() {
                     />
                   </div>
                   <div>
-                    <Label className="text-[10px] text-muted-foreground">Instagram Handle / Actor ID</Label>
+                    <Label className="text-[10px] text-muted-foreground">Instagram Account ID / Actor ID</Label>
                     <Input
                       value={manualInstagramActorId}
                       onChange={(e) => setManualInstagramActorId(e.target.value)}
-                      placeholder="@clientbrand"
+                      placeholder="Numeric Instagram account ID"
                       className="text-xs mt-0.5 font-mono"
                     />
                   </div>
@@ -1625,7 +1692,7 @@ export default function AdCampaignsPage() {
                     <Input
                       value={manualFormId}
                       onChange={(e) => setManualFormId(e.target.value)}
-                      placeholder="FORM_AURA_HIGH_INTENT"
+                      placeholder="Numeric Meta lead form ID"
                       className="text-xs mt-0.5 font-mono"
                     />
                   </div>
@@ -1633,7 +1700,7 @@ export default function AdCampaignsPage() {
                     <Label className="text-[10px] text-muted-foreground">Dispatch Security Status</Label>
                     <div className="h-8 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-semibold flex items-center px-2 mt-0.5 gap-1">
                       <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                      <span>R3 Execution Guard Ready</span>
+                      <span>Setup validation required before platform creation</span>
                     </div>
                   </div>
                 </div>
@@ -1692,7 +1759,7 @@ export default function AdCampaignsPage() {
                     ) : (
                       <>
                         <Zap className="w-3.5 h-3.5" />
-                        🎨 Approve & Render 1080×1080 Ad Poster Flight →
+                        🎨 Create campaign draft and image preview →
                       </>
                     )}
                   </Button>
@@ -1741,7 +1808,7 @@ export default function AdCampaignsPage() {
                     size="sm"
                     variant="outline"
                     onClick={() => handleToggleStatus(selectedCampaign.campaignId)}
-                    disabled={togglingId === selectedCampaign.campaignId}
+                    disabled={togglingId === selectedCampaign.campaignId || !selectedCampaign.metaCampaignId || selectedCampaign.syncStatus !== "SYNCED"}
                     className="h-7 text-xs gap-1 border-border/60"
                   >
                     {selectedCampaign.status === "Active" || selectedCampaign.status === "Live" ? (
@@ -1756,10 +1823,14 @@ export default function AdCampaignsPage() {
                   {selectedCampaign.campaignName}
                 </DialogTitle>
                 <DialogDescription>
-                  Client: {selectedCampaign.customerId?.companyName || selectedCampaign.customerId?.name || "Client Account"} • Location: {selectedCampaign.targetLocations?.join(", ") || "Metro Flagship"}
+                  Client: {selectedCampaign.customerId?.name || selectedCampaign.customerId?.companyName || "Client Account"} • Location: {selectedCampaign.targetLocations?.join(", ") || "Metro Flagship"}
                 </DialogDescription>
               </DialogHeader>
 
+              {actionError && <p role="alert" className="text-sm text-destructive rounded border border-destructive p-3">{actionError}</p>}
+              {preflightMessage && <p role="status" className="text-sm text-emerald-700">{preflightMessage}</p>}
+              {selectedCampaign.dispatchError && <p className="text-sm text-amber-700">Last platform attempt: {selectedCampaign.dispatchError}</p>}
+              {selectedCampaign.metaCampaignId && <p className="text-sm text-muted-foreground">Meta campaign {selectedCampaign.metaCampaignId} · {selectedCampaign.platformStatus || selectedCampaign.externalStatus}. Platform-created blueprints are read-only here; create a new draft to change configuration.</p>}
               {/* BLUEPRINT TABS */}
               <Tabs defaultValue="creatives" className="space-y-3">
                 <TabsList className="bg-muted/60 border border-border/40 p-1">
@@ -1791,7 +1862,7 @@ export default function AdCampaignsPage() {
                             subheadline={selectedCampaign.creativePosterAsset.subheadline || selectedCampaign.adVariants?.[0]?.primaryText}
                             offerText={selectedCampaign.creativePosterAsset.offerBadge || selectedCampaign.promotedOffer}
                             ctaText={selectedCampaign.creativePosterAsset.ctaText || selectedCampaign.adVariants?.[0]?.callToAction || "Book Now"}
-                            brandName={selectedCampaign.customerId?.companyName || selectedCampaign.customerId?.name || "Client Brand"}
+                            brandName={selectedCampaign.customerId?.name || selectedCampaign.customerId?.companyName || "Client Brand"}
                             logoUrl={selectedCampaign.customerId?.logoUrl || selectedCampaign.customerId?.brandProfile?.logoUrl || selectedCampaign.creativePosterAsset?.brandLogoUrl}
                             phone={(selectedCampaign.customerId?.contactNumbers && selectedCampaign.customerId?.contactNumbers[0]) || selectedCampaign.customerId?.phone}
                             website={selectedCampaign.customerId?.website}
@@ -2189,7 +2260,7 @@ export default function AdCampaignsPage() {
 
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <Label className="text-[10px] text-muted-foreground uppercase font-bold">Budget Split (%)</Label>
+                            <Label className="text-[10px] text-muted-foreground uppercase font-bold">Budget Weight</Label>
                             <Input
                               type="number"
                               value={aud.dailyBudgetShare || 33}
@@ -2216,8 +2287,8 @@ export default function AdCampaignsPage() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="All">All Genders</SelectItem>
-                                <SelectItem value="Female">Female</SelectItem>
-                                <SelectItem value="Male">Male</SelectItem>
+                                <SelectItem value="Women">Women</SelectItem>
+                                <SelectItem value="Men">Men</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -2272,10 +2343,17 @@ export default function AdCampaignsPage() {
 
                 {/* TAB 4: LIVE DISPATCH CREDENTIALS */}
                 <TabsContent value="meta" className="space-y-3 mt-0">
+                  <div className="rounded-lg border p-3 space-y-2 text-sm">
+                    <p className="font-medium">Connected accounts for this customer</p>
+                    {connectionError && <p role="alert" className="text-destructive">{connectionError}</p>}
+                    {!connectedAccounts.length && !connectionError && <p className="text-muted-foreground">No connected accounts found. Connect Facebook, Instagram and an ad account in customer onboarding.</p>}
+                    {connectedAccounts.filter(a => ['MetaAdAccount', 'FacebookPage', 'InstagramBusiness'].includes(a.accountType)).map(a => <Button key={a._id} variant="outline" size="sm" className="mr-2" disabled={!!selectedCampaign.metaCampaignId} onClick={() => setSelectedCampaign((prev: any) => ({ ...prev, metaSettings: { ...prev.metaSettings, [a.accountType === 'MetaAdAccount' ? 'adAccountId' : a.accountType === 'FacebookPage' ? 'pageId' : 'instagramActorId']: a.platformAccountId } }))}>{a.platformAccountName} · {a.accountType}</Button>)}
+                    <Button variant="link" size="sm" onClick={() => navigate(`/customers/${connectionCustomerId}/onboarding`)}>Manage customer connections</Button>
+                  </div>
                   <div className="p-4 rounded-xl bg-muted/40 border border-border/60 space-y-3 text-xs">
                     <div className="flex items-center justify-between font-semibold text-foreground border-b border-border/40 pb-2">
                       <span className="flex items-center gap-1.5 text-emerald-400">
-                        <Settings className="w-4 h-4" /> Live Platform Dispatch Credentials & Routing
+                        <Settings className="w-4 h-4" /> Platform accounts and routing
                       </span>
                       <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
                         Ready for Graph API Dispatch
@@ -2312,7 +2390,7 @@ export default function AdCampaignsPage() {
                         />
                       </div>
                       <div>
-                        <Label className="text-[10px] text-muted-foreground uppercase font-bold">Instagram Handle</Label>
+                        <Label className="text-[10px] text-muted-foreground uppercase font-bold">Instagram Account ID</Label>
                         <Input
                           value={selectedCampaign.metaSettings?.instagramActorId || ""}
                           onChange={(e) =>
@@ -2321,7 +2399,7 @@ export default function AdCampaignsPage() {
                               metaSettings: { ...(prev.metaSettings || {}), instagramActorId: e.target.value },
                             }))
                           }
-                          placeholder="@clientbrand"
+                          placeholder="Numeric Instagram account ID"
                           className="text-xs mt-1 font-mono text-indigo-400"
                         />
                       </div>
@@ -2349,7 +2427,7 @@ export default function AdCampaignsPage() {
                               metaSettings: { ...(prev.metaSettings || {}), leadGenFormId: e.target.value },
                             }))
                           }
-                          placeholder="FORM_AURA_HIGH_INTENT"
+                          placeholder="Numeric Meta lead form ID"
                           className="text-xs mt-1 font-mono"
                         />
                       </div>
@@ -2417,46 +2495,28 @@ export default function AdCampaignsPage() {
                   <div className="p-4 rounded-xl bg-muted/40 border border-border/60 text-xs space-y-3">
                     <div className="flex items-center justify-between font-semibold text-foreground border-b border-border/40 pb-2">
                       <span className="flex items-center gap-1.5 text-emerald-400">
-                        <ShieldCheck className="w-4 h-4" /> AI Policy & Budget Safety Audit
+                        <ShieldCheck className="w-4 h-4" /> Blueprint review checklist
                       </span>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => {
                           const checks = [
-                            `Daily budget ₹${selectedCampaign.budget?.amount || 1000} within safe threshold limits`,
-                            `Geo-targeting radius verified in ${selectedCampaign.targetLocations?.[0] || 'Target Metro'}`,
-                            Boolean(selectedCampaign.metaSettings?.privacyPolicyUrl) ? "Privacy policy verified for Meta lead forms" : "⚠️ Add privacy policy URL for full compliance",
-                            "Copywriting complies with Meta & Google Ad Policies",
-                            `Special Ad Category declared as: ${selectedCampaign.specialAdCategory || 'NONE'}`,
-                            `${selectedCampaign.audiences?.length || 3} audience tiers segmented with budget splits`,
-                            Boolean(selectedCampaign.metaSettings?.adAccountId) ? `Meta Ad Account ${selectedCampaign.metaSettings?.adAccountId} verified` : "⚠️ Ad account ID required",
+                            `Daily budget entered: ${selectedCampaign.budget?.currency || 'INR'} ${selectedCampaign.budget?.amount || 0}`,
+                            `Target locations entered: ${(selectedCampaign.targetLocations || []).join(', ') || 'None'}`,
+                            `Special ad category selected: ${selectedCampaign.specialAdCategory || 'NONE'}`,
+                            `Audience tiers: ${selectedCampaign.audiences?.length || 0}`,
                           ];
-                          setSelectedCampaign((prev: any) => ({
-                            ...prev,
-                            qaAudit: {
-                              status: "PASSED",
-                              auditedAt: new Date().toISOString(),
-                              checks,
-                            },
-                          }));
-                          toast.success("🛡️ Live Compliance & Policy Audit completed!");
+                          setSelectedCampaign((prev: any) => ({ ...prev, qaAudit: { passed: false, checkedAt: new Date().toISOString(), checks, warnings: ['Account access and advertising policy compliance are not verified by this checklist.'] } }));
+                          toast.info("Blueprint checklist updated. Platform validation runs during creation.");
                         }}
                         className="h-6 text-[10px] text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 gap-1"
                       >
-                        <ShieldCheck className="w-3 h-3" /> Re-Run Audit
+                        <ShieldCheck className="w-3 h-3" /> Review checklist
                       </Button>
                     </div>
                     <ul className="space-y-1.5 text-muted-foreground">
-                      {(selectedCampaign.qaAudit?.checks || [
-                        "Daily budget within safe threshold limits",
-                        "Geo-targeting radius verified in target metro",
-                        "Privacy policy verified for Meta lead forms",
-                        "Copywriting complies with Meta & Google Ad Policies",
-                        "Special Ad Category declaration checked",
-                        "Multi-tier audience segmentation verified",
-                        "Meta ad account and pixel verified",
-                      ]).map((chk: string, i: number) => (
+                      {(selectedCampaign.qaAudit?.checks || ["No checks recorded. Review the blueprint before approval."]).map((chk: string, i: number) => (
                         <li key={i} className="flex items-center gap-2 text-emerald-400/90 font-medium">
                           <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                           <span>{chk}</span>
@@ -2477,7 +2537,7 @@ export default function AdCampaignsPage() {
                     size="sm"
                     variant="secondary"
                     onClick={handleSaveInspectorChanges}
-                    disabled={isSavingInspector}
+                    disabled={isSavingInspector || !!selectedCampaign.metaCampaignId}
                     className="bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 gap-1.5"
                   >
                     {isSavingInspector ? (
@@ -2495,6 +2555,12 @@ export default function AdCampaignsPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" disabled={checkingPreflight || selectedCampaign.platform !== 'Meta'} onClick={async () => {
+                    setActionError(''); setPreflightMessage(''); setCheckingPreflight(true);
+                    try { const result = await preflightAdCampaign(selectedCampaign.campaignId || selectedCampaign._id); setPreflightMessage(result.message); }
+                    catch (error: any) { setActionError(error.message); }
+                    finally { setCheckingPreflight(false); }
+                  }}>{checkingPreflight ? 'Checking…' : 'Validate saved Meta setup'}</Button>
                   {selectedCampaign.status === "Pending Approval" ? (
                     <Button
                       size="sm"
@@ -2508,7 +2574,7 @@ export default function AdCampaignsPage() {
                         </>
                       ) : (
                         <>
-                          <Check className="w-3.5 h-3.5" /> Approve & Launch Live
+                          <Check className="w-3.5 h-3.5" /> Approve Blueprint
                         </>
                       )}
                     </Button>
@@ -2516,18 +2582,18 @@ export default function AdCampaignsPage() {
                     <Button
                       size="sm"
                       onClick={() => handleDispatch(selectedCampaign.campaignId || selectedCampaign._id)}
-                      disabled={dispatchingId === (selectedCampaign.campaignId || selectedCampaign._id)}
+                      disabled={dispatchingId === (selectedCampaign.campaignId || selectedCampaign._id) || selectedCampaign.syncStatus === 'SYNCED' || selectedCampaign.status !== "Approved" || selectedCampaign.platform !== "Meta"}
                       className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white text-xs gap-1.5 shadow-md font-semibold"
                     >
                       {dispatchingId === (selectedCampaign.campaignId || selectedCampaign._id) ? (
                         <>
                           <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                          Deploying Live...
+                          Creating on Meta...
                         </>
                       ) : (
                         <>
                           <Send className="w-3.5 h-3.5" />
-                          🚀 Deploy Live to Meta / Google
+                          Create on Meta (paused)
                         </>
                       )}
                     </Button>

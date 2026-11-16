@@ -38,6 +38,7 @@ const MetaDiscoverySessionSchema = new mongoose.Schema(
       required: true,
     },
     grantedScopes: [{ type: String }],
+    discoveryWarnings: [{ type: String }],
     pages: [
       {
         pageId: { type: String, required: true },

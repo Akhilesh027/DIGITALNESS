@@ -3,6 +3,8 @@ export type WorkspaceState =
   | "UNDERSTANDING"
   | "AWAITING_ENTITY"
   | "COLLECTING_INPUT"
+  | "AWAITING_FINAL_REVIEW"
+  | "AWAITING_DELIVERY_SCHEDULE"
   | "AWAITING_APPROVAL"
   | "EXECUTING"
   | "COMPLETED"
@@ -110,6 +112,7 @@ export type CreativeBriefBlock = {
     brandStyle: string;
     primaryColors: string;
     colorPalette?: { primary: string; secondary: string; accent: string; text: string };
+    phone?: string;
     logoStatus: string;
     website: string;
   };
@@ -124,6 +127,8 @@ export type CreativeBriefBlock = {
   communication: {
     headline: string;
     supportingLine: string;
+    caption?: string;
+    hashtags?: string[];
     dateHighlight: string;
     cta: string;
   };
@@ -142,10 +147,13 @@ export type CreativeBriefBlock = {
 };
 
 export type PosterPreviewQABlock = {
+  isDemoPreview?: boolean;
+  qaStatus?: string;
   type: "poster_preview_qa";
   creativeRunId: string;
   client: {
     name: string;
+    phone?: string;
     industry?: string;
     primaryColors?: string;
     colorPalette?: { primary: string; secondary: string; accent: string; text: string };
@@ -170,6 +178,8 @@ export type PosterPreviewQABlock = {
 };
 
 export type DeliveryScheduleBlock = {
+  isDraftOnly?: boolean;
+  publishAllowed?: boolean;
   type: "delivery_schedule";
   creativeRunId: string;
   destination: string;

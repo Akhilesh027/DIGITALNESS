@@ -75,6 +75,20 @@ export const rechargeCustomerPlan = async (id: string, payload: any) => {
   return data;
 };
 
+export const getRenewalNotices = async (id: string) => {
+  const res = await fetch(`${API_URL}/customers/${id}/renewal-notices`, { headers: authHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to load renewal reminders');
+  return data;
+};
+
+export const retryRenewalNotice = async (id: string, noticeId: string) => {
+  const res = await fetch(`${API_URL}/customers/${id}/renewal-notices/${noticeId}/retry`, { method: 'POST', headers: jsonHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'Failed to retry reminder');
+  return data;
+};
+
 export const getCustomerRechargeStatus = async (id: string) => {
   const res = await fetch(`${API_URL}/customers/${id}/recharge-status`, {
     headers: authHeaders(),

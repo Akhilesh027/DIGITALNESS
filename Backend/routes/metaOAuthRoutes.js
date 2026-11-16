@@ -10,6 +10,10 @@ const MetaDiscoverySession = require("../models/MetaDiscoverySession");
 const Customer = require("../models/Customer");
 const ClientLocation = require("../models/ClientLocation");
 const { protect } = require("../middleware/authMiddleware");
+const { metaDiscoveryRedirect } = require('../utils/metaRedirect');
+const { fetchMetaPage } = require('../ai/integrations/meta/metaDiscoveryClient');
+const { decryptToken, encryptToken } = require('../utils/cryptoUtil');
+const metaConfig = require('../config/meta');
 
 /**
  * GET /api/integrations/meta/connect
@@ -107,7 +111,7 @@ router.get("/callback", async (req, res) => {
     }
 
     // Redirect to frontend asset selection screen
-    const clientRedirectUrl = `/dashboard/marketing?tab=connections&metaDiscoverySession=${session.sessionId}&customerId=${session.customerId}`;
+    const clientRedirectUrl = metaDiscoveryRedirect(session);
     return res.redirect(clientRedirectUrl);
   } catch (err) {
     return res.status(err.code === "META_OAUTH_STATE_INVALID" ? 401 : 500).json({
@@ -122,6 +126,30 @@ router.get("/callback", async (req, res) => {
  * GET /api/integrations/meta/discovery/:sessionId
  * Retrieves sanitized discovered assets for UI asset selection
  */
+router.post('/discovery/:sessionId/page', protect, async (req, res) => {
+  try {
+    if (!req.user?._id || String(req.user.role || '').toLowerCase() === 'client') return res.status(403).json({ success: false, message: 'Staff access required.' });
+    const { pageId } = req.body;
+    if (!/^\d+$/.test(String(pageId || ''))) return res.status(400).json({ success: false, message: 'Enter a numeric Facebook Page ID.' });
+    const session = await MetaDiscoverySession.findOne({ sessionId: req.params.sessionId, userId: req.user._id, status: 'ACTIVE', expiresAt: { $gt: new Date() } });
+    if (!session) return res.status(404).json({ success: false, message: 'Discovery session expired or unavailable. Reconnect Meta.' });
+    const page = await fetchMetaPage({ pageId, accessToken: decryptToken(session.userAccessTokenEncrypted), version: metaConfig.graphApiVersion });
+    const entry = {
+      pageId: page.id, name: page.name, category: page.category || '',
+      pageAccessTokenEncrypted: page.access_token ? encryptToken(page.access_token) : null,
+      hasInstagram: Boolean(page.instagram_business_account?.id),
+      instagramBusinessAccountId: page.instagram_business_account?.id || null,
+      instagramUsername: page.instagram_business_account?.username || null,
+    };
+    const previous = session.pages.find(p => p.pageId === page.id);
+    if (previous) Object.assign(previous, entry); else session.pages.push(entry);
+    await session.save();
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
+  }
+});
+
 router.get("/discovery/:sessionId", protect, async (req, res) => {
   try {
     const session = await MetaDiscoverySession.findOne({
@@ -166,6 +194,7 @@ router.get("/discovery/:sessionId", protect, async (req, res) => {
         customerId: session.customerId,
         locationId: session.locationId,
         grantedScopes: session.grantedScopes,
+        discoveryWarnings: session.discoveryWarnings || [],
         pages: sanitizedPages,
         adAccounts: sanitizedAdAccounts,
         expiresAt: session.expiresAt,
@@ -201,7 +230,7 @@ router.post("/confirm-assets", protect, async (req, res) => {
 
     return res.status(200).json({ success: true, data: result });
   } catch (error) {
-    const status = error.code === "ASSET_NOT_AUTHORIZED" || error.code === "TENANT_MISMATCH" ? 403 : 500;
+    const status = error.code === 'META_ASSET_SELECTION_REQUIRED' ? 400 : error.code === "ASSET_NOT_AUTHORIZED" || error.code === "TENANT_MISMATCH" ? 403 : 500;
     return res.status(status).json({
       success: false,
       code: error.code || "CONFIRM_ASSETS_FAILED",

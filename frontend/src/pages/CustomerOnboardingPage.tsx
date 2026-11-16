@@ -38,7 +38,7 @@ export default function CustomerOnboardingPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(() => new URLSearchParams(window.location.search).has("metaDiscoverySession") ? 8 : 1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [customer, setCustomer] = useState<any>(null);

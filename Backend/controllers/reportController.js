@@ -4,6 +4,7 @@ const DailyUpdate = require("../models/DailyUpdate");
 const User = require("../models/User");
 const Payment = require("../models/Payment");
 const Invoice = require("../models/Invoice");
+const { periodFor, buildActivityReport } = require('../services/clientActivityReport');
 
 const ADMIN_ROLES = ["Admin", "admin"];
 const MANAGER_ROLES = ["Operational Manager", "Branch Manager"];
@@ -17,6 +18,7 @@ const normalizeDate = (date) => {
 };
 
 const canAccessCustomer = async (user, customerId) => {
+  if (user.role === 'Client') return String(user.customerId || '') === String(customerId);
   if (ADMIN_ROLES.includes(user.role)) return true;
 
   const customer = await Customer.findById(customerId);
@@ -197,14 +199,17 @@ exports.getCustomerProjectsReport = async (req, res) => {
 
 exports.getCustomerDailyReport = async (req, res) => {
   try {
-    await getCustomerOrFail(req.params.customerId, req.user);
+    const customer = await getCustomerOrFail(req.params.customerId, req.user);
 
-    const updates = await getCustomerUpdates(req.params.customerId, req.query);
+    const type = req.path.replace(/\/$/, '').endsWith('/weekly') ? 'weekly' : 'daily';
+    const period = periodFor(type, req.query);
+    const updates = await getCustomerUpdates(req.params.customerId, period);
 
     res.json({
       success: true,
       count: updates.length,
       data: updates,
+      report: buildActivityReport(type, customer, period, updates),
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({
@@ -214,11 +219,14 @@ exports.getCustomerDailyReport = async (req, res) => {
   }
 };
 
+exports.getCustomerWeeklyReport = exports.getCustomerDailyReport;
+
 exports.getCustomerMonthlyReport = async (req, res) => {
   try {
-    await getCustomerOrFail(req.params.customerId, req.user);
+    const customer = await getCustomerOrFail(req.params.customerId, req.user);
 
-    const updates = await getCustomerUpdates(req.params.customerId, req.query);
+    const period = periodFor('monthly', req.query);
+    const updates = await getCustomerUpdates(req.params.customerId, period);
     const works = await getCustomerWorks(req.params.customerId);
 
     const totalHours = updates.reduce(
@@ -235,6 +243,7 @@ exports.getCustomerMonthlyReport = async (req, res) => {
 
     res.json({
       success: true,
+      report: buildActivityReport('monthly', customer, period, updates),
       data: {
         totalHours,
         completedTasks,

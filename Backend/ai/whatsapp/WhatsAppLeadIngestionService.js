@@ -77,6 +77,12 @@ class WhatsAppLeadIngestionService {
     const status = statusObj.status; // sent, delivered, read, failed
     const timestamp = statusObj.timestamp ? new Date(parseInt(statusObj.timestamp) * 1000) : new Date();
 
+    const renewalStates = { sent: 'Sent', delivered: 'Delivered', read: 'Read', failed: 'Failed' };
+    if (renewalStates[status]) {
+      const allowedPrevious = { sent: ['Sending', 'Sent'], delivered: ['Sending', 'Sent', 'Delivered'], read: ['Sending', 'Sent', 'Delivered', 'Read'], failed: ['Sending', 'Sent', 'Failed'] };
+      await require('../../models/RenewalNotice').updateOne({ providerId: providerMessageId, status: { $in: allowedPrevious[status] } }, { $set: { status: renewalStates[status], ...(status === 'failed' ? { error: statusObj.errors?.[0]?.message || statusObj.errors?.[0]?.title || 'WhatsApp delivery failed' } : {}) } });
+    }
+
     const leadMsg = await LeadMessage.findOne({ providerMessageId });
     if (!leadMsg) {
       return { type: "STATUS_UPDATE", updated: false, reason: "MESSAGE_NOT_FOUND", providerMessageId };

@@ -258,6 +258,7 @@ const creativeProjectSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    generationDraftId: { type: String, unique: true, sparse: true },
 
     versions: {
       type: [creativeVersionSchema],

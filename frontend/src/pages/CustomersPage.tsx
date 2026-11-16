@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { RechargeAccessControlModal } from "@/components/customers/RechargeAccessControlModal";
+import { formatServiceExpiry } from "@/lib/serviceExpiry";
 import {
   Dialog,
   DialogContent,
@@ -377,7 +378,9 @@ export default function CustomersPage() {
       const res = await fetch(`${API_URL}/customers`, getAuthConfig());
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.message || "Failed to fetch customers");
-      setCustomers(getArrayData(data));
+      const refreshedCustomers = getArrayData(data);
+      setCustomers(refreshedCustomers);
+      setSelectedCustomer(current => current ? refreshedCustomers.find((item: Customer) => item._id === current._id) || null : null);
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Could not load customers", variant: "destructive" });
     } finally {
@@ -760,6 +763,7 @@ export default function CustomersPage() {
           ["Branch", branchName(customer.branchId || customer.branch)],
           ["Assigned To", getAssignedName(customer.assignedTo)],
           ["Package", customer.package || "—"],
+          ["Expiry Date", formatServiceExpiry(customer.rechargePlan?.validUntil)],
           ["Services", customer.requirements?.join(", ") || "—"],
           ["Status", customer.status || "Active"],
           ["Paid", formatCurrency(customer.totalPaid || 0)],
@@ -935,11 +939,9 @@ export default function CustomersPage() {
                           <Lock className="w-3 h-3 mr-1" /> Portal Held
                         </Badge>
                       )}
-                      {customer.rechargePlan?.validUntil && (
-                        <Badge variant="outline" className="text-primary border-primary/40 font-mono text-[10px] px-2 py-0.5 rounded-md">
-                          📅 {new Date(customer.rechargePlan.validUntil) < new Date() ? "Expired" : "Active Plan"}
-                        </Badge>
-                      )}
+                      <Badge variant="outline" className="text-primary border-primary/40 text-[10px] px-2 py-0.5 rounded-md">
+                        Expiry Date: {formatServiceExpiry(customer.rechargePlan?.validUntil)}
+                      </Badge>
                       <Badge variant="secondary" className="text-[10px] font-medium px-2 py-0.5 rounded-md">{customerWorks.length} Works</Badge>
                       <Badge variant="outline" className="text-[10px] font-medium px-2 py-0.5 rounded-md">{docsCount} Docs</Badge>
                       <Badge
@@ -1199,6 +1201,7 @@ function CustomerProfileDialog({ customer, onClose, onEdit, formatCurrency, bran
         ["Assigned Employee", getAssignedName(customer.assignedTo)],
         ["Assigned Manager", getAssignedName(customer.assignedManager)],
         ["Package / Plan", customer.package || "—"],
+        ["Expiry Date", formatServiceExpiry(customer.rechargePlan?.validUntil)],
         ["Customer Status", customer.status || "Active"],
         ["Client Login", customer.userId ? "Linked" : "Not Created"],
       ],
@@ -1305,6 +1308,7 @@ function CustomerProfileDialog({ customer, onClose, onEdit, formatCurrency, bran
                   <Badge variant={customer.status === "Inactive" ? "destructive" : "default"} className="text-[10px] px-1.5 py-0.5">{customer.status || "Active"}</Badge>
                   <Badge variant="outline" className="font-mono text-[9px] px-1.5 py-0.5">ID: {customer._id}</Badge>
                   {customer.package && <Badge variant="outline" className="text-[10px] px-1.5 py-0.5"><Package className="w-3 h-3 mr-1" />{customer.package}</Badge>}
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0.5">Expiry Date: {formatServiceExpiry(customer.rechargePlan?.validUntil)}</Badge>
                 </div>
               </div>
             </div>

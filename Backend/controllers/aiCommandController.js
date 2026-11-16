@@ -14,6 +14,7 @@ const {
 } = require("../ai/execution/executionCoordinator");
 const AICommandExecution = require("../models/AICommandExecution");
 const commandRegistry = require("../ai/commands/commandRegistry");
+const { aiRecordScope } = require('../middleware/aiAccessMiddleware');
 
 exports.handleCommandRequest = async (req, res) => {
   try {
@@ -200,7 +201,7 @@ exports.getCommandExecutionById = async (req, res) => {
 exports.getCommandHistory = async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 30, 100);
-    const executions = await AICommandExecution.find()
+    const executions = await AICommandExecution.find(aiRecordScope(req.user))
       .populate("requestedBy", "name email role")
       .populate("resolvedEntities.customerId", "name companyName")
       .populate("resolvedEntities.employeeId", "name email")

@@ -83,6 +83,15 @@ const userSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    serviceGrants: {
+      type: [new mongoose.Schema({
+        customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+        service: { type: String, enum: ['Google Ads', 'Meta Ads', 'Social Media'], required: true },
+        actions: [{ type: String, enum: ['view', 'edit', 'approve', 'publish', 'export'] }],
+      }, { _id: false })],
+      default: [],
+    },
+    accessVersion: { type: Number, default: 0 },
 
     department: {
       type: String,

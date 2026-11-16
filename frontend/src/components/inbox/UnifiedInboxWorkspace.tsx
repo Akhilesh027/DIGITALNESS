@@ -112,7 +112,8 @@ export const UnifiedInboxWorkspace: React.FC = () => {
         setItemDetail(detailRes);
       }
       if (item.channel === "WHATSAPP") {
-        getWhatsAppTemplates().then((tpl) => setTemplates(tpl.templates || []));
+        const tpl = await getWhatsAppTemplates({ customerId: item.customerId?._id, status: "APPROVED" });
+        setTemplates(tpl.templates || []);
       }
     } catch (err: any) {
       toast.error("Failed to load item detail.");
@@ -136,14 +137,15 @@ export const UnifiedInboxWorkspace: React.FC = () => {
         if (selectedTemplate) {
           payload.messageType = "TEMPLATE";
           payload.templateName = selectedTemplate;
+          payload.templateLanguage = templates.find(t => t.name === selectedTemplate)?.language || "en_US";
         } else {
           payload.messageType = "TEXT";
           payload.text = replyText;
         }
 
-        const res = await sendWhatsAppOutboundMessage(payload);
+        const res = await sendWhatsAppOutboundMessage(selectedItem.sourceId, payload);
         if (res.success) {
-          toast.success("Reply dispatched successfully.");
+          toast.success(res.message || "Reply submitted for approval.");
           setReplyText("");
           setSelectedTemplate("");
           handleSelectItem(selectedItem);
@@ -573,8 +575,8 @@ export const UnifiedInboxWorkspace: React.FC = () => {
                         >
                           <option value="">-- Or Select Approved Meta Template --</option>
                           {templates.map((t) => (
-                            <option key={t.templateName} value={t.templateName}>
-                              {t.templateName} ({t.category})
+                            <option key={t._id} value={t.name}>
+                              {t.name} ({t.category})
                             </option>
                           ))}
                         </select>

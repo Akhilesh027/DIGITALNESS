@@ -207,7 +207,9 @@ function hoursBetween(start?: string, end?: string, breakMinutes = 0) {
 }
 
 function getAttendanceStatus(row: AttendanceRow): AttendanceStatus | string {
-  if (row.status) return row.status;
+  if (row.status === "On Leave" || row.status === "Half Day" || row.status === "Absent") {
+    return row.status;
+  }
   if (!row.loginTime) return "Absent";
 
   const loginDate = getTimeValue(row.loginTime);
@@ -219,7 +221,7 @@ function getAttendanceStatus(row: AttendanceRow): AttendanceStatus | string {
 
   const hours = row.attendanceHours || row.updateHours;
   if (hours > 0 && hours < 4) return "Half Day";
-  return "Present";
+  return row.status || "Present";
 }
 
 function statusVariant(status?: string) {
@@ -357,12 +359,14 @@ export default function AttendancePage() {
   const rows = useMemo<AttendanceRow[]>(() => {
     const attendanceByEmployee = new Map<string, AttendanceRecord>();
     attendance.forEach((record) => {
+      if (record.date && toDateKey(record.date) !== selectedDate) return;
       const employeeId = getId(record.employee || record.user);
       if (employeeId) attendanceByEmployee.set(employeeId, record);
     });
 
     const updatesByEmployee = new Map<string, WorkUpdate[]>();
     updates.forEach((update) => {
+      if (update.date && toDateKey(update.date) !== selectedDate) return;
       const employeeId = getId(update.employee || update.user);
       if (!employeeId) return;
       const list = updatesByEmployee.get(employeeId) || [];

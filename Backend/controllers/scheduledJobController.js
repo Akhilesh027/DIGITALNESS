@@ -180,22 +180,25 @@ exports.reconcileQueue = async (req, res) => {
 
 exports.createOrUpdateSchedule = async (req, res) => {
   try {
+    const { actionScope, businessDayBounds } = require("../services/dashboardActionPolicy");
+    const scope = actionScope(req.user);
+    if (req.client || scope.denied) return res.status(403).json({ success: false, message: "Staff account and assigned branch required." });
     const { creativeRunId, contentItemId, scheduledFor, slot, platforms, notes } = req.body;
 
-    let targetDate = new Date();
+    const { start } = businessDayBounds();
+    let targetDate;
     if (scheduledFor) {
-      targetDate = new Date(scheduledFor);
-    } else if (slot && slot.includes("5:30 PM")) {
-      targetDate.setDate(targetDate.getDate() + 1);
-      targetDate.setHours(17, 30, 0, 0);
+      const dateText = String(scheduledFor);
+      targetDate = new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(dateText) ? dateText : `${dateText}+05:30`);
     } else if (slot && slot.includes("Saturday")) {
-      const day = targetDate.getDay();
-      const diff = (6 - day + 7) % 7 || 7;
-      targetDate.setDate(targetDate.getDate() + diff);
-      targetDate.setHours(11, 30, 0, 0);
+      const indiaDay = new Date(start.getTime() + 19800000).getUTCDay();
+      targetDate = new Date(start.getTime() + ((6 - indiaDay + 7) % 7 || 7) * 86400000 + 11.5 * 3600000);
     } else {
-      targetDate.setDate(targetDate.getDate() + 1);
-      targetDate.setHours(10, 0, 0, 0);
+      targetDate = new Date(start.getTime() + 86400000 + (slot && slot.includes("5:30 PM") ? 17.5 : 10) * 3600000);
+    }
+
+    if (Number.isNaN(targetDate.getTime()) || targetDate <= new Date()) {
+      return res.status(400).json({ success: false, message: "Choose a valid future schedule date." });
     }
 
     let job = null;
@@ -210,10 +213,19 @@ exports.createOrUpdateSchedule = async (req, res) => {
       }
     }
 
+    if (!job) return res.status(404).json({ success: false, message: "No saved schedule exists for this creative. Approve and save it first." });
+    if (scope.kind === "branch") {
+      const Customer = require("../models/Customer");
+      const customer = await Customer.findOne({ _id: job.customerId, branchId: scope.branchId }).select("_id").lean();
+      if (!customer) return res.status(404).json({ success: false, message: "Schedule not found." });
+    } else if (scope.kind === "assigned" && String(job.createdBy) !== String(scope.userId)) {
+      return res.status(404).json({ success: false, message: "Schedule not found." });
+    }
+    if (["Processing", "Completed", "Cancelled"].includes(job.status)) return res.status(409).json({ success: false, message: "This schedule cannot be changed in its current state." });
     if (job) {
       job.scheduledFor = targetDate;
-      if (platforms) job.payload.platforms = platforms;
-      if (notes) job.payload.notes = notes;
+      job.payload = { ...job.payload, ...(platforms ? { platforms } : {}), ...(notes != null ? { notes } : {}) };
+      job.markModified("payload");
       job.status = "Pending";
       await job.save();
 

@@ -11,8 +11,10 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { getToken } from "@/api/auth";
 import { useToast } from "@/hooks/use-toast";
 import {
+  API_BASE,
   sendWorkspaceMessage,
   fetchConversations,
   fetchConversationById,
@@ -25,12 +27,16 @@ import { AutomationCenter } from "@/components/automation/AutomationCenter";
 import { ExecutiveBriefingCard } from "@/components/ai/ExecutiveBriefingCard";
 
 export default function AIWorkspacePage() {
+  let user: any = {};
+  try { user = JSON.parse(localStorage.getItem("user") || localStorage.getItem("currentUser") || "{}"); } catch { /* Start with a fresh chat when stored account data is invalid. */ }
+  const accountId = user._id || user.id || "staff";
+  const conversationKey = `active_ai_conv_id_${accountId}`;
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"chat" | "automation">("chat");
 
   // Conversational Chat State
   const [conversationId, setConversationId] = useState<string>(() => {
-    return localStorage.getItem("active_ai_conv_id") || `conv_${Date.now().toString(36)}`;
+    return localStorage.getItem(conversationKey) || `conv_${Date.now().toString(36)}`;
   });
   const [messages, setMessages] = useState<WorkspaceMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,25 +44,28 @@ export default function AIWorkspacePage() {
 
   // Save active conversationId
   useEffect(() => {
-    localStorage.setItem("active_ai_conv_id", conversationId);
-  }, [conversationId]);
+    localStorage.setItem(conversationKey, conversationId);
+  }, [conversationId, conversationKey]);
 
   // Load active conversation messages from backend
   useEffect(() => {
+    let active = true;
+    setMessages([]);
     const loadConversation = async () => {
       try {
         const conv = await fetchConversationById(conversationId);
-        if (conv && conv.messages) {
+        if (active && conv && conv.messages) {
           setMessages(conv.messages);
         }
-      } catch (err) {
-        // New conversation, start fresh
+      } catch (err: any) {
+        if (active && err.status !== 404) toast({ title: "Unable to load chat", description: err.message, variant: "destructive" });
       }
     };
     loadConversation();
     fetchConversations()
       .then(setRecentConversations)
       .catch(() => null);
+    return () => { active = false; };
   }, [conversationId]);
 
   // 1. Handle Send Natural Language Text Turn
@@ -238,8 +247,8 @@ export default function AIWorkspacePage() {
 
     // Sync to backend /scheduler DB
     try {
-      const token = localStorage.getItem("token");
-      await fetch("https://server.digitalness.co.in/api/scheduled-jobs/update-slot", {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/scheduled-jobs/update-slot`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -253,19 +262,22 @@ export default function AIWorkspacePage() {
           notes: scheduleDetails?.notes || "",
         }),
       });
+      const result = await res.json();
+      if (!res.ok || !result.success || !result.job?._id) throw new Error(result.message || "No saved schedule was returned");
     } catch (e: any) {
-      console.warn("Failed to sync schedule update to backend:", e.message);
+      toast({ title: "Schedule not saved", description: e.message, variant: "destructive" });
+      return;
     }
 
     toast({
-      title: "🚀 Post Scheduled & Synced",
-      description: `Asset queued for ${platforms.join(" & ")} on ${slot}. Appears live on /scheduler.`,
+      title: "Schedule saved",
+      description: `Asset queued for ${platforms.join(" & ")} on ${slot}. Review it in the scheduler.`,
     });
 
     const scheduleConfirmMsg: WorkspaceMessage = {
       turnId: `schedule_${Date.now()}`,
       role: "assistant",
-      text: `🚀 **Asset Confirmed & Scheduled!**\n\nThe creative, caption, and hashtags have been queued in the **CRM Content Calendar & Scheduler Dashboard**:\n- 📅 **Scheduled Slot**: ${slot}\n- 📱 **Channels**: ${platforms.join(", ")}\n- 🎯 **Status**: Queued for Auto-Publishing${notes}\n- 🔗 **View in Queue**: [Open Scheduler Feed](http://localhost:8080/scheduler)`,
+      text: `🚀 **Asset Confirmed & Scheduled!**\n\nThe creative, caption, and hashtags have been queued in the **CRM Content Calendar & Scheduler Dashboard**:\n- 📅 **Scheduled Slot**: ${slot}\n- 📱 **Channels**: ${platforms.join(", ")}\n- 🎯 **Status**: Schedule saved; publication requires execution checks${notes}\n- 🔗 **View in Queue**: [Open Scheduler Feed](/scheduler)`,
       state: "COMPLETED",
       uiBlocks: [],
       timestamp: new Date(),
@@ -278,51 +290,40 @@ export default function AIWorkspacePage() {
   const [chatMode, setChatMode] = useState<"agency" | "client">("agency");
   const [activeClient, setActiveClient] = useState<any | null>(null);
 
-  // Dynamic Live Customers fetched from CRM MongoDB
-  const [liveCustomers, setLiveCustomers] = useState<any[]>([
-    { _id: "cust_aura", name: "Aura Aesthetics Clinic", businessType: "Healthcare / Skincare", city: "Hyderabad", branchId: "BR001", monthlyRetainer: "₹75,000/mo" },
-    { _id: "cust_prestige", name: "Prestige SkyVillas", businessType: "Luxury Real Estate", city: "Hyderabad", branchId: "BR001", monthlyRetainer: "₹1,20,000/mo" },
-    { _id: "cust_cloudscale", name: "CloudScale AI Systems", businessType: "B2B SaaS / Enterprise", city: "Bangalore", branchId: "BR001", monthlyRetainer: "₹95,000/mo" },
-    { _id: "cust_vogue", name: "VogueCraft Atelier", businessType: "D2C Fashion", city: "Mumbai", branchId: "BR001", monthlyRetainer: "₹65,000/mo" },
-    { _id: "cust_amber", name: "The Amber Table", businessType: "Fine Dining", city: "Hyderabad", branchId: "BR001", monthlyRetainer: "₹50,000/mo" },
-  ]);
-
-  // Fetch real customers from CRM API
+  const [liveCustomers, setLiveCustomers] = useState<any[]>([]);
   useEffect(() => {
-    const fetchCustomers = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const res = await fetch("https://server.digitalness.co.in/api/customers", {
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-        });
-        const json = await res.json();
-        const data = json.data || (Array.isArray(json) ? json : []);
-        if (Array.isArray(data) && data.length > 0) {
-          setLiveCustomers(data);
-        }
-      } catch (e) {
-        console.warn("Using preset customer roster for AI Workspace:", e);
-      }
-    };
-    fetchCustomers();
-  }, []);
+    const controller = new AbortController();
+    fetch(`${API_BASE}/customers`, {
+      headers: { Authorization: `Bearer ${getToken()}` }, signal: controller.signal,
+    }).then(async res => {
+      if (!res.ok) throw new Error("Unable to load CRM clients");
+      const json = await res.json();
+      const data = Array.isArray(json) ? json : json.data || json.customers;
+      if (!Array.isArray(data)) throw new Error("Unexpected CRM client response");
+      if (!controller.signal.aborted) setLiveCustomers(data);
+    }).catch(err => {
+      if (!controller.signal.aborted) toast({ title: "Client list unavailable", description: err.message, variant: "destructive" });
+    });
+    return () => controller.abort();
+  }, [toast]);
 
   // Switch to Global Agency Chat Mode
   const handleSelectAgencyChat = () => {
+    if (loading) return;
     setChatMode("agency");
     setActiveClient(null);
-    const agencyConvId = "agency_global_copilot";
+    const agencyConvId = `agency_global_copilot_${accountId}`;
+    setMessages([]);
     setConversationId(agencyConvId);
   };
 
   // Switch to Dedicated Client Chat Mode & Auto-Load Client 360 Overview
   const handleSelectClientChat = async (client: any) => {
+    if (loading) return;
     setChatMode("client");
     setActiveClient(client);
-    const clientConvId = `conv_client_${client._id || client.name.replace(/\s+/g, "_")}`;
+    const clientConvId = `conv_client_${client._id}_${accountId}`;
+    setMessages([]);
     setConversationId(clientConvId);
 
     try {
@@ -338,6 +339,7 @@ export default function AIWorkspacePage() {
   };
 
   const handleStartNewChat = () => {
+    if (loading) return;
     if (chatMode === "client" && activeClient) {
       const newId = `conv_client_${activeClient._id || activeClient.name.replace(/\s+/g, "_")}_${Date.now().toString(36)}`;
       setConversationId(newId);
@@ -576,6 +578,7 @@ export default function AIWorkspacePage() {
                   <div
                     key={conv.conversationId || idx}
                     onClick={() => {
+                      if (loading) return;
                       setConversationId(conv.conversationId);
                       setMessages(conv.messages || []);
                     }}

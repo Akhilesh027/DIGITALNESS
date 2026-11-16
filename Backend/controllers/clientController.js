@@ -215,7 +215,8 @@ exports.loginClient = async (req, res) => {
       });
     }
 
-    const customer = await Customer.findById(client.customerId);
+    let customer = await Customer.findById(client.customerId);
+    if (customer) customer = await require('../services/renewalService').enforce(customer);
 
     const token = generateToken(client._id);
 
@@ -253,7 +254,8 @@ exports.getClientMe = async (req, res) => {
       return res.status(404).json({ message: "Client record not found" });
     }
 
-    const customer = await Customer.findById(client.customerId);
+    let customer = await Customer.findById(client.customerId);
+    if (customer) customer = await require('../services/renewalService').enforce(customer);
 
     return res.status(200).json({
       success: true,

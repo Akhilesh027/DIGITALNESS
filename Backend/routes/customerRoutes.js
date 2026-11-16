@@ -35,10 +35,23 @@ router.get("/branch/:branchId", getCustomersByBranch);
 router.get("/:id/readiness", getCustomerReadiness);
 router.get("/:id/context-preview", getContextPreview);
 router.get("/:id/recharge-status", getCustomerRechargeStatus);
-router.post("/:id/lock-portal", lockCustomerPortal);
-router.post("/:id/unlock-portal", unlockCustomerPortal);
-router.post("/:id/recharge", rechargeCustomerPlan);
-router.post("/:id/send-recharge-alert", sendRechargeDueAlert);
+const renewalAccess = require('../middleware/renewalAccess');
+router.post("/:id/lock-portal", renewalAccess, lockCustomerPortal);
+router.post("/:id/unlock-portal", renewalAccess, unlockCustomerPortal);
+router.post("/:id/recharge", renewalAccess, rechargeCustomerPlan);
+router.post("/:id/send-recharge-alert", renewalAccess, sendRechargeDueAlert);
+router.get('/:id/renewal-notices', renewalAccess, async (req, res, next) => {
+  try {
+    const customer = await require('../models/Customer').findById(req.params.id);
+    await require('../services/renewalService').reconcile(customer);
+    const notices = await require('../models/RenewalNotice').find({ customerId: customer._id }).sort({ createdAt: -1 }).limit(30);
+    res.json({ success: true, data: notices, cutoffAt: customer.rechargePlan?.validUntil ? require('../services/renewalPolicy').cutoffFor(customer.rechargePlan.validUntil) : null });
+  } catch (error) { next(error); }
+});
+router.post('/:id/renewal-notices/:noticeId/retry', renewalAccess, async (req, res) => {
+  try { res.json({ success: true, data: await require('../services/renewalService').retry(req.params.id, req.params.noticeId) }); }
+  catch (error) { res.status(400).json({ success: false, message: error.message }); }
+});
 router.post("/:id/communications", addCustomerCommunication);
 router.post("/:id/documents", addCustomerDocument);
 router.delete("/:id/documents/:documentIndex", deleteCustomerDocument);

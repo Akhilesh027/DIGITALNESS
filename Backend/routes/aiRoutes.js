@@ -108,6 +108,10 @@ const {
 const router = express.Router();
 
 router.use(protect);
+const { requireStaff, requireAgentRun, requireCommand } = require('../middleware/aiAccessMiddleware');
+router.use(requireStaff);
+router.use('/runs/:id', requireAgentRun);
+router.use('/command/:executionId', requireCommand);
 
 // ----------------------------------------------------
 // PHASE 5: AUTONOMOUS AGENCY OS & AUTOMATION CENTER

@@ -70,6 +70,18 @@ exports.protect = async (req, res, next) => {
         customerId: client.customerId,
       };
 
+      const Customer = require('../models/Customer');
+      const renewal = require('../services/renewalService');
+      let customer = await Customer.findById(client.customerId);
+      if (!customer) return res.status(403).json({ message: 'Customer account is unavailable' });
+      customer = await renewal.enforce(customer);
+      const path = req.originalUrl.split('?')[0].replace(/\/$/, '');
+      // Keep the status screen and account security reachable while held.
+      const allowedWhileHeld = ['/api/clients/me', '/api/clients/change-password'].includes(path)
+        || path === `/api/customers/${String(client.customerId)}/recharge-status`
+        || (customer?.accessControl?.holdType === 'PAYMENT_OVERDUE' && path === '/api/payments' && ['GET', 'POST'].includes(req.method));
+      if (customer?.accessControl?.isPortalLocked && !allowedWhileHeld) return res.status(423).json({ success: false, code: 'PORTAL_ON_HOLD', message: customer.accessControl.lockMessage, accessControl: customer.accessControl });
+
       return next();
     }
 
@@ -82,8 +94,9 @@ exports.protect = async (req, res, next) => {
       });
     }
 
+    if (user.status === 'Inactive') return res.status(403).json({ message: 'Your account is inactive' });
     req.user = user;
-    next();
+    require('../services/servicePermissions').employeeBoundary(req, res, next);
   } catch (error) {
     console.error("Auth protect error:", error.message);
     res.status(401).json({

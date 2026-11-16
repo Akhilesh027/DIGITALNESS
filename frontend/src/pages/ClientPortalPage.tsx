@@ -72,6 +72,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useInvoiceStore } from "@/store/invoiceStore";
+import ClientReports from "@/components/client-portal/ClientReports";
 import MonthlyPlannerSection from "@/components/client-portal/MonthlyPlannerSection";
 
 const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
@@ -192,7 +193,6 @@ export default function ClientPortalPage() {
   const [verifyingPaymentId, setVerifyingPaymentId] = useState<string | null>(null);
   const [acceptingProposalId, setAcceptingProposalId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [reportLoading, setReportLoading] = useState<string | null>(null);
 
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
   const [active, setActive] = useState<Section>("overview");
@@ -1344,35 +1344,6 @@ export default function ClientPortalPage() {
     [customer, overview, reportRange]
   );
 
-  const callReportApi = async (endpoint: string, label: string) => {
-    try {
-      if (!selectedCustomerId) return;
-      setReportLoading(label);
-
-      const res = await fetch(endpoint, getAuthConfig());
-
-      if (!res.ok) {
-        throw new Error("Report API not available yet");
-      }
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${label}-${getCustomerName(customer)}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-
-      toast({ title: "Report Downloaded", description: `${label} downloaded successfully` });
-    } catch {
-      printClientReport(label);
-    } finally {
-      setReportLoading(null);
-    }
-  };
-
   const printClientReport = (label: string) => {
     const rows = customerWorks
       .map(
@@ -1461,28 +1432,8 @@ export default function ClientPortalPage() {
   };
 
   const downloadReport = (type: "daily" | "weekly" | "monthly" | "project" | "payment") => {
-    const params = new URLSearchParams({
-      fromDate: reportRange.fromDate,
-      toDate: reportRange.toDate,
-    });
-
-    const endpoints: Record<string, string> = {
-      daily: `${API_URL}/reports/customer/${selectedCustomerId}/daily?${params}`,
-      weekly: `${API_URL}/reports/customer/${selectedCustomerId}/weekly?${params}`,
-      monthly: `${API_URL}/reports/customer/${selectedCustomerId}/monthly?${params}`,
-      project: `${API_URL}/reports/customer/${selectedCustomerId}/projects?${params}`,
-      payment: `${API_URL}/reports/customer/${selectedCustomerId}/payments?${params}`,
-    };
-
-    const labels: Record<string, string> = {
-      daily: "Daily Client Report",
-      weekly: "Weekly Client Report",
-      monthly: "Monthly Client Report",
-      project: "Project Progress Report",
-      payment: "Payment Report",
-    };
-
-    callReportApi(endpoints[type], labels[type]);
+    setReportType(type);
+    setActive("reports");
   };
 
   const StatCard = ({ title, value, icon: Icon, className }: any) => (
@@ -2688,73 +2639,7 @@ export default function ClientPortalPage() {
         )}
 
         {active === "reports" && (
-          <div className="space-y-5">
-            <div className="rounded-3xl border bg-card p-5 shadow-sm">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold">Client Reports</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Generate daily, weekly, monthly, project, payment and performance reports.
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div>
-                    <p className="mb-1 text-xs text-muted-foreground">Report Type</p>
-                    <Select value={reportType} onValueChange={setReportType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="daily">Daily</SelectItem>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="project">Project</SelectItem>
-                        <SelectItem value="payment">Payment</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <p className="mb-1 text-xs text-muted-foreground">From</p>
-                    <Input
-                      type="date"
-                      value={reportRange.fromDate}
-                      onChange={(e) => setReportRange({ ...reportRange, fromDate: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <p className="mb-1 text-xs text-muted-foreground">To</p>
-                    <Input
-                      type="date"
-                      value={reportRange.toDate}
-                      onChange={(e) => setReportRange({ ...reportRange, toDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-                <ReportButton title="Daily Report" type="daily" onClick={downloadReport} loading={reportLoading} />
-                <ReportButton title="Weekly Report" type="weekly" onClick={downloadReport} loading={reportLoading} />
-                <ReportButton title="Monthly Report" type="monthly" onClick={downloadReport} loading={reportLoading} />
-                <ReportButton title="Project Report" type="project" onClick={downloadReport} loading={reportLoading} />
-                <ReportButton title="Payment Report" type="payment" onClick={downloadReport} loading={reportLoading} />
-              </div>
-            </div>
-
-            <div className="rounded-3xl border bg-card p-5 shadow-sm">
-              <h2 className="text-lg font-semibold">Report Preview</h2>
-              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <PreviewItem label="Client" value={reportSummary.client} />
-                <PreviewItem label="Company" value={reportSummary.company} />
-                <PreviewItem label="Total Works" value={reportSummary.totalWorks} />
-                <PreviewItem label="Average Progress" value={`${reportSummary.avgProgress}%`} />
-                <PreviewItem label="Completed Works" value={reportSummary.completedWorks} />
-                <PreviewItem label="Team Members" value={reportSummary.teamCount} />
-                <PreviewItem label="Paid Amount" value={formatMoney(reportSummary.paid)} />
-                <PreviewItem label="Pending Amount" value={formatMoney(reportSummary.pendingAmount)} />
-              </div>
-            </div>
-          </div>
+          <ClientReports key={reportType} customerId={selectedCustomerId} customerName={getCustomerName(customer)} initialType={reportType} />
         )}
 
         {active === "downloads" && (
@@ -3661,24 +3546,6 @@ function PreviewItem({ label, value }: { label: string; value: any }) {
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 font-semibold text-foreground">{value || "-"}</p>
     </div>
-  );
-}
-
-function ReportButton({ title, type, onClick, loading }: any) {
-  return (
-    <Button
-      variant="outline"
-      className="h-auto flex-col items-start gap-2 p-4 text-left"
-      onClick={() => onClick(type)}
-      disabled={loading === title}
-    >
-      <div className="flex w-full items-center justify-between">
-        <FileText className="h-5 w-5 text-primary" />
-        {loading === title ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-      </div>
-      <span className="font-semibold">{title}</span>
-      <span className="text-xs text-muted-foreground">Download / print PDF report</span>
-    </Button>
   );
 }
 

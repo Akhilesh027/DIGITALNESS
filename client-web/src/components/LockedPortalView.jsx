@@ -69,7 +69,7 @@ export const LockedPortalView = () => {
   }, [customerId]);
 
   React.useEffect(() => {
-    checkPendingPayments();
+    if (customer?.accessControl?.holdType !== 'EXPIRY') checkPendingPayments();
 
     // Fast poll profile every 4 seconds to instantly detect when admin verifies & unlocks
     const interval = setInterval(async () => {
@@ -77,7 +77,7 @@ export const LockedPortalView = () => {
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [checkPendingPayments, refreshProfile]);
+  }, [checkPendingPayments, refreshProfile, customer?.accessControl?.holdType]);
 
   const copyToClipboard = (text, fieldName) => {
     navigator.clipboard?.writeText(text);
@@ -88,7 +88,7 @@ export const LockedPortalView = () => {
   const handleManualRefresh = async () => {
     setRefreshing(true);
     await refreshProfile();
-    await checkPendingPayments();
+    if (customer?.accessControl?.holdType !== 'EXPIRY') await checkPendingPayments();
     setRefreshing(false);
   };
 
@@ -142,6 +142,19 @@ export const LockedPortalView = () => {
       setSubmitting(false);
     }
   };
+
+  if (customer?.accessControl?.holdType === 'EXPIRY') {
+    return <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-5">
+      <section className="w-full max-w-xl space-y-5 rounded-2xl border border-amber-500/30 p-6">
+        <Lock className="h-8 w-8 text-amber-400" />
+        <h1 className="text-2xl font-bold">Portal access on hold</h1>
+        <p>{lockMessage}</p>
+        <p className="text-sm text-slate-300">Expiry Date: {String(customer.rechargePlan?.validUntil || '').slice(0, 10)}. The three-day grace period has ended. Internal service delivery continues.</p>
+        <p className="text-sm text-slate-300">Contact your Digitalness account manager to renew. Portal access is restored after an authorized renewal; recording a payment alone does not change the service end date.</p>
+        <div className="flex flex-wrap gap-3"><button className="rounded-lg bg-amber-400 px-4 py-2 font-semibold text-slate-950" disabled={refreshing} onClick={handleManualRefresh}>{refreshing ? 'Checking…' : 'Check Renewal Status'}</button><button className="rounded-lg border border-slate-600 px-4 py-2" onClick={logout}>Sign Out</button></div>
+      </section>
+    </main>;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between relative overflow-hidden">

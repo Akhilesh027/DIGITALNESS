@@ -278,7 +278,7 @@ router.post(
         customerDoc.totalPaid = (customerDoc.totalPaid || 0) + numAmount;
         customerDoc.totalPending = Math.max(0, (customerDoc.totalPending || 0) - numAmount);
 
-        if (customerDoc.accessControl?.isPortalLocked) {
+        if (customerDoc.accessControl?.isPortalLocked && customerDoc.accessControl.holdType === 'PAYMENT_OVERDUE' && customerDoc.totalPending <= 0 && !require('../services/renewalPolicy').expiryDue(customerDoc)) {
           customerDoc.accessControl = {
             isPortalLocked: false,
             lockReason: "",
@@ -588,7 +588,7 @@ router.patch("/:id/verify", protect, async (req, res) => {
       customerDoc.totalPending = Math.max(0, (customerDoc.totalPending || 0) - numAmount);
 
       // Auto-remove holding when admin verifies and approves the payment proof
-      if (customerDoc.accessControl?.isPortalLocked) {
+      if (customerDoc.accessControl?.isPortalLocked && customerDoc.accessControl.holdType === 'PAYMENT_OVERDUE' && customerDoc.totalPending <= 0 && !require('../services/renewalPolicy').expiryDue(customerDoc)) {
         customerDoc.accessControl = {
           isPortalLocked: false,
           lockReason: "",

@@ -45,6 +45,8 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import EmployeeServiceAccess from '@/components/EmployeeServiceAccess';
+import { useServiceAccess } from '@/lib/serviceAccess';
 
 const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 
@@ -250,6 +252,8 @@ const formatDateInput = (value?: string) => {
 };
 
 export default function EmployeesPage() {
+  const [accessEmployeeId, setAccessEmployeeId] = useState<string | null>(null);
+  const { access } = useServiceAccess();
   const { toast } = useToast();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -1228,6 +1232,7 @@ export default function EmployeesPage() {
 
         <Button
           variant="gradient"
+          disabled={access?.mode !== 'company'}
           disabled={submitting || branches.length === 0}
           onClick={isEdit ? handleEditEmployee : handleAddEmployee}
           className="flex-1"
@@ -1479,6 +1484,7 @@ export default function EmployeesPage() {
                 </div>
 
                 <div className="flex gap-1">
+                  {access?.mode === 'company' && <Button variant="outline" size="sm" onClick={() => setAccessEmployeeId(employee._id)}><Shield className="mr-1 h-4 w-4" />Access</Button>}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -1491,6 +1497,7 @@ export default function EmployeesPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() => openEditModal(employee)}
+                    disabled={access?.mode !== 'company'}
                   >
                     <Edit className="w-4 h-4" />
                   </Button>
@@ -1498,7 +1505,7 @@ export default function EmployeesPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    disabled={deletingId === employee._id}
+                    disabled={deletingId === employee._id || access?.mode !== 'company'}
                     onClick={() => handleDelete(employee._id, employee.name)}
                     className="text-destructive hover:text-destructive"
                   >
@@ -1514,6 +1521,8 @@ export default function EmployeesPage() {
           ))}
         </motion.div>
       )}
+
+      <EmployeeServiceAccess employeeId={accessEmployeeId} onClose={() => setAccessEmployeeId(null)} />
 
       <Dialog open={!!selectedEmployee} onOpenChange={() => setSelectedEmployee(null)}>
         <DialogContent className="w-[95vw] max-w-4xl max-h-[92vh] overflow-y-auto">

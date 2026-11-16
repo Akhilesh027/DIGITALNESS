@@ -1,5 +1,11 @@
 const API_BASE = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 
+async function readResponse(res: Response) {
+  const data = await res.json().catch(() => { throw new Error(`Ads API returned an invalid response (${res.status}).`); });
+  if (!res.ok || data.success === false) throw new Error(data.error || data.message || `Ads request failed (${res.status}).`);
+  return data;
+}
+
 function authHeaders() {
   const token =
     localStorage.getItem("token") ||
@@ -20,7 +26,7 @@ export async function fetchAdCampaigns(params: { customerId?: string; status?: s
   const res = await fetch(`${API_BASE}/ads/campaigns?${query.toString()}`, {
     headers: authHeaders(),
   });
-  const data = await res.json();
+  const data = await readResponse(res);
   return data.campaigns || [];
 }
 
@@ -28,7 +34,7 @@ export async function fetchAdCampaignById(id: string) {
   const res = await fetch(`${API_BASE}/ads/campaigns/${id}`, {
     headers: authHeaders(),
   });
-  const data = await res.json();
+  const data = await readResponse(res);
   return data.campaign;
 }
 
@@ -51,7 +57,7 @@ export async function synthesizeAdCampaign(payload: {
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
-  return res.json();
+  return readResponse(res);
 }
 
 export async function createManualAdCampaign(payload: any) {
@@ -60,7 +66,7 @@ export async function createManualAdCampaign(payload: any) {
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
-  return res.json();
+  return readResponse(res);
 }
 
 export async function generateAdPoster(id: string, payload: { prompt?: string; headline?: string; subheadline?: string; offerBadge?: string; theme?: string }) {
@@ -69,7 +75,7 @@ export async function generateAdPoster(id: string, payload: { prompt?: string; h
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
-  return res.json();
+  return readResponse(res);
 }
 
 export async function approveAdCampaign(id: string) {
@@ -77,15 +83,16 @@ export async function approveAdCampaign(id: string) {
     method: "POST",
     headers: authHeaders(),
   });
-  return res.json();
+  return readResponse(res);
 }
 
-export async function toggleAdCampaignStatus(id: string) {
+export async function toggleAdCampaignStatus(id: string, confirmActivation = false) {
   const res = await fetch(`${API_BASE}/ads/campaigns/${id}/toggle-status`, {
     method: "POST",
     headers: authHeaders(),
+    body: JSON.stringify({ confirmActivation }),
   });
-  return res.json();
+  return readResponse(res);
 }
 
 export async function updateAdCampaign(id: string, updates: any) {
@@ -94,7 +101,7 @@ export async function updateAdCampaign(id: string, updates: any) {
     headers: authHeaders(),
     body: JSON.stringify(updates),
   });
-  return res.json();
+  return readResponse(res);
 }
 
 export async function attachCreativeToAdCampaign(id: string, data: { creativeProjectId: string; variantIndex?: number; headline?: string }) {
@@ -103,7 +110,7 @@ export async function attachCreativeToAdCampaign(id: string, data: { creativePro
     headers: authHeaders(),
     body: JSON.stringify(data),
   });
-  return res.json();
+  return readResponse(res);
 }
 
 export async function scanAdCampaignPerformance() {
@@ -111,7 +118,7 @@ export async function scanAdCampaignPerformance() {
     method: "POST",
     headers: authHeaders(),
   });
-  return res.json();
+  return readResponse(res);
 }
 
 export async function dispatchAdCampaign(id: string, payload: any = {}) {
@@ -120,7 +127,12 @@ export async function dispatchAdCampaign(id: string, payload: any = {}) {
     headers: authHeaders(),
     body: JSON.stringify(payload),
   });
-  return res.json();
+  return readResponse(res);
+}
+
+export async function preflightAdCampaign(id: string) {
+  const res = await fetch(`${API_BASE}/ads/campaigns/${id}/preflight`, { headers: authHeaders() });
+  return readResponse(res);
 }
 
 export async function reviseAdCampaign(id: string, updates: any) {
@@ -129,5 +141,5 @@ export async function reviseAdCampaign(id: string, updates: any) {
     headers: authHeaders(),
     body: JSON.stringify(updates),
   });
-  return res.json();
+  return readResponse(res);
 }

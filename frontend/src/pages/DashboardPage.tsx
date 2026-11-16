@@ -1,3 +1,4 @@
+import { TodayActions } from '@/components/dashboard/TodayActions';
 import { useEffect, useMemo, useState } from 'react';
 import { clearAuth, getToken, authHeaders } from '@/api/auth';
 import { motion } from 'framer-motion';
@@ -254,8 +255,7 @@ async function fetcher<T>(endpoint: string, token?: string | null): Promise<T> {
     if (Array.isArray(json?.data?.[key])) return json.data[key] as T;
   }
 
-  console.warn(`Unexpected response shape for ${endpoint}:`, json);
-  return [] as T;
+  throw new Error(`Unexpected response shape for ${endpoint}`);
 }
 
 // ===================== DASHBOARD =====================
@@ -304,6 +304,7 @@ export default function DashboardPage() {
           : 'Your assigned work and recent updates';
 
   const [loading, setLoading] = useState(true);
+  const [failedSources, setFailedSources] = useState<string[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -313,21 +314,24 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const fetchAll = async () => {
-      const activeToken = localStorage.getItem('token') || '';
+      const activeToken = getToken() || '';
       if (!activeToken) {
         setLoading(false);
         return;
       }
 
       setLoading(true);
+      setFailedSources([]);
+      const failed: string[] = [];
+      const unavailable = (source: string) => { failed.push(source); return []; };
 
       try {
         const [usersData, customersData, leadsData, worksData, ticketsData] = await Promise.all([
-          fetcher<Employee[]>('users', activeToken).catch(() => []),
-          fetcher<Customer[]>('customers', activeToken).catch(() => []),
-          fetcher<Lead[]>('leads', activeToken).catch(() => []),
-          fetcher<Work[]>('works', activeToken).catch(() => []),
-          fetcher<Ticket[]>('tickets', activeToken).catch(() => []),
+          fetcher<Employee[]>('users', activeToken).catch(() => unavailable('users')),
+          fetcher<Customer[]>('customers', activeToken).catch(() => unavailable('customers')),
+          fetcher<Lead[]>('leads', activeToken).catch(() => unavailable('leads')),
+          fetcher<Work[]>('works', activeToken).catch(() => unavailable('works')),
+          fetcher<Ticket[]>('tickets', activeToken).catch(() => unavailable('tickets')),
         ]);
 
         let employeesList = Array.isArray(usersData) ? usersData : [];
@@ -369,6 +373,7 @@ export default function DashboardPage() {
           ticketsList = ticketsList.filter((ticket) => isAssignedToUser(ticket.assignedTo, userId));
         }
 
+        setFailedSources(failed);
         setEmployees(employeesList);
         setCustomers(customersList);
         setLeads(leadsList);
@@ -460,10 +465,13 @@ export default function DashboardPage() {
   ]);
 
   // ===================== DERIVED DATA =====================
-  const today = new Date().toISOString().split('T')[0];
+  const businessDate = (date: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+  const today = businessDate(new Date());
 
   const todayFollowups = leads.filter(
-    (lead) => lead.nextFollowUpDate && lead.nextFollowUpDate.split('T')[0] === today
+    (lead) => lead.nextFollowUpDate && !Number.isNaN(new Date(lead.nextFollowUpDate).getTime()) &&
+      businessDate(new Date(lead.nextFollowUpDate)) === today &&
+      !['Own Close', 'Own Loss', 'Converted', 'Lost', 'Won'].includes(lead.status)
   ).length;
 
   const completedWorks = works.filter((work) => work.status === 'Completed').length;
@@ -656,6 +664,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 pb-10">
+      {failedSources.length > 0 && <p role="alert" className="rounded-xl border border-destructive p-4 text-sm text-destructive">Some dashboard data could not load: {failedSources.join(", ")}. Their totals and charts are incomplete. Reload the page to retry.</p>}
+      <TodayActions />
       {/* Dynamic Executive Cockpit Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}

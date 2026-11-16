@@ -210,7 +210,7 @@ const adCampaignSchema = new mongoose.Schema(
     },
 
     qaAudit: {
-      passed: { type: Boolean, default: true },
+      passed: { type: Boolean, default: false },
       checks: { type: [String], default: [] },
       warnings: { type: [String], default: [] },
       checkedAt: { type: Date, default: Date.now },
@@ -243,6 +243,18 @@ const adCampaignSchema = new mongoose.Schema(
       type: Number,
       default: 1,
     },
+    platformCampaignId: { type: String, default: '' },
+    platformStatus: { type: String, default: 'NOT_CREATED' },
+    externalStatus: { type: String, default: 'NOT_CREATED' },
+    syncStatus: { type: String, default: 'NOT_SYNCED' },
+    metaCampaignId: { type: String, default: '' },
+    metaCreativeId: { type: String, default: '' },
+    metaAdSetIds: { type: [String], default: [] },
+    metaAdIds: { type: [String], default: [] },
+    dispatchLockAt: { type: Date, default: null },
+    dispatchError: { type: String, default: '' },
+    metrics: { type: mongoose.Schema.Types.Mixed, default: {} },
+    launchedAt: { type: Date, default: null },
 
     versionHistory: [
       {

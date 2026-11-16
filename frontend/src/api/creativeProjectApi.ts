@@ -146,8 +146,10 @@ export const synthesizeAICreativePrompt = async (payload: {
   occasion?: string;
   customPrompt?: string;
   topic?: string;
+  provider?: 'openai';
+  theme?: string;
 }) => {
-  const res = await fetch(`${API_URL}/creatives/synthesize-prompt`, {
+  const res = await fetch(`${API_URL}/creatives/${payload.provider === 'openai' ? 'openai/prompt' : 'synthesize-prompt'}`, {
     method: "POST",
     headers: jsonHeaders(),
     body: JSON.stringify(payload),
@@ -166,8 +168,10 @@ export const generateAICreative = async (payload: {
   locationId?: string;
   occasion?: string;
   customPrompt?: string;
+  provider?: 'openai';
+  draftId?: string;
 }) => {
-  const res = await fetch(`${API_URL}/creatives/generate`, {
+  const res = await fetch(`${API_URL}/creatives/${payload.provider === 'openai' ? 'openai/generate' : 'generate'}`, {
     method: "POST",
     headers: jsonHeaders(),
     body: JSON.stringify(payload),
@@ -179,6 +183,13 @@ export const generateAICreative = async (payload: {
   }
 
   return await res.json();
+};
+
+export const getOpenAIStudioStatus = async () => {
+  const res = await fetch(`${API_URL}/creatives/openai/status`, { headers: authHeaders() });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || 'OpenAI Studio configuration could not be loaded.');
+  return data.data;
 };
 
 export const requestAICreativeRevision = async (payload: {

@@ -105,6 +105,12 @@ export const getMetaDiscoverySession = async (sessionId: string) => {
   return response.data.data;
 };
 
+export const discoverMetaPage = async (sessionId: string, pageId: string) => {
+  const baseUrl = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
+  const response = await axios.post(`${baseUrl}/integrations/meta/discovery/${encodeURIComponent(sessionId)}/page`, { pageId }, getAuthHeaders());
+  return response.data;
+};
+
 export const confirmMetaAssets = async (payload: {
   discoverySessionId: string;
   customerId: string;

@@ -12,6 +12,7 @@ const {
   approveOutput,
 } = require("../ai/orchestrator/executionCoordinator");
 const AgentRun = require("../models/AgentRun");
+const { aiRecordScope } = require('../middleware/aiAccessMiddleware');
 
 exports.getAIProviderStatus = async (req, res) => {
   try {
@@ -95,7 +96,7 @@ exports.generateDirectPrompt = async (req, res) => {
 
 exports.getAgentRuns = async (req, res) => {
   try {
-    const runs = await AgentRun.find()
+    const runs = await AgentRun.find(aiRecordScope(req.user))
       .populate("customerId", "name companyName city")
       .populate("clientLocationId", "name address city")
       .sort({ createdAt: -1 })

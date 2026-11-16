@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -24,11 +24,13 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatServiceExpiry } from "@/lib/serviceExpiry";
 import {
   lockCustomerPortal,
   unlockCustomerPortal,
   rechargeCustomerPlan,
-  sendRechargeDueAlert,
+  getRenewalNotices,
+  retryRenewalNotice,
 } from "@/api/customerApi";
 
 interface RechargeAccessControlModalProps {
@@ -57,15 +59,55 @@ export const RechargeAccessControlModal: React.FC<RechargeAccessControlModalProp
   const [sendLockAlert, setSendLockAlert] = useState(true);
 
   // Recharge form state
-  const [rechargeDays, setRechargeDays] = useState(30);
+  const [serviceEndDate, setServiceEndDate] = useState("");
   const [planName, setPlanName] = useState(customer?.rechargePlan?.planName || customer?.package || "Standard Retainer");
   const [monthlyAmount, setMonthlyAmount] = useState(
-    String(customer?.rechargePlan?.monthlyAmount || customer?.package || "25000")
+    customer?.rechargePlan?.monthlyAmount == null ? "" : String(customer.rechargePlan.monthlyAmount)
   );
-  const [autoUnlockOnRecharge, setAutoUnlockOnRecharge] = useState(true);
 
   // Alert form state
-  const [customAlertMsg, setCustomAlertMsg] = useState("");
+  const [notices, setNotices] = useState<any[]>([]);
+  const [noticeError, setNoticeError] = useState("");
+  const [noticeLoading, setNoticeLoading] = useState(false);
+  const [confirmPastDate, setConfirmPastDate] = useState(false);
+
+  const loadNotices = async () => {
+    if (!customer?._id) return;
+    setNoticeLoading(true);
+    setNoticeError("");
+    try { const result = await getRenewalNotices(customer._id); setNotices(result.data || []); }
+    catch (error: any) { setNoticeError(error.message); }
+    finally { setNoticeLoading(false); }
+  };
+  useEffect(() => {
+    if (!open || !customer?._id) return;
+    let cancelled = false;
+    setNotices([]); setNoticeError(""); setNoticeLoading(true);
+    getRenewalNotices(customer._id).then(result => { if (!cancelled) setNotices(result.data || []); })
+      .catch(error => { if (!cancelled) setNoticeError(error.message); })
+      .finally(() => { if (!cancelled) setNoticeLoading(false); });
+    return () => { cancelled = true; };
+  }, [open, customer?._id]);
+
+  useEffect(() => {
+    if (!open) return;
+    const savedDate = customer?.rechargePlan?.validUntil;
+    setServiceEndDate(savedDate ? String(savedDate).slice(0, 10) : "");
+    setPlanName(customer?.rechargePlan?.planName || customer?.package || "Standard Retainer");
+    setMonthlyAmount(customer?.rechargePlan?.monthlyAmount == null ? "" : String(customer.rechargePlan.monthlyAmount));
+    setConfirmPastDate(false);
+  }, [open, customer?._id, customer?.rechargePlan?.validUntil]);
+
+  const parsedEndDate = serviceEndDate ? new Date(`${serviceEndDate}T00:00:00Z`) : null;
+  const isValidEndDate = /^\d{4}-\d{2}-\d{2}$/.test(serviceEndDate)
+    && parsedEndDate !== null && !Number.isNaN(parsedEndDate.getTime())
+    && parsedEndDate.toISOString().slice(0, 10) === serviceEndDate;
+  const endDateLabel = isValidEndDate
+    ? parsedEndDate!.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" })
+    : "";
+  const todayIST = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const isPastDate = isValidEndDate && serviceEndDate < todayIST;
+  const selectedCutoff = isValidEndDate ? new Date(parsedEndDate!.getTime() + 4 * 86400000 - 330 * 60000).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '';
 
   if (!customer) return null;
 
@@ -76,7 +118,8 @@ export const RechargeAccessControlModal: React.FC<RechargeAccessControlModalProp
   let daysRemaining: number | null = null;
   let isExpired = false;
   if (validUntil) {
-    const diffMs = validUntil.getTime() - Date.now();
+    const expiryEnd = new Date(`${String(customer.rechargePlan.validUntil).slice(0, 10)}T00:00:00Z`).getTime() + 86400000 - 330 * 60000;
+    const diffMs = expiryEnd - Date.now();
     daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
     isExpired = daysRemaining <= 0;
   }
@@ -136,18 +179,22 @@ export const RechargeAccessControlModal: React.FC<RechargeAccessControlModalProp
 
   // 3. Handle Recharge
   const handleRecharge = async () => {
+    if (!isValidEndDate || (isPastDate && !confirmPastDate)) {
+      toast({ title: "Service End Date Required", description: "Choose a valid service end date before confirming.", variant: "destructive" });
+      return;
+    }
     try {
       setLoading(true);
       await rechargeCustomerPlan(customer._id, {
         planName,
-        days: rechargeDays,
-        monthlyAmount: Number(monthlyAmount),
-        autoUnlock: autoUnlockOnRecharge,
+        validUntil: serviceEndDate,
+        monthlyAmount: monthlyAmount.trim() ? Number(monthlyAmount) : null,
+        autoUnlock: true,
       });
 
       toast({
         title: "Service Recharged",
-        description: `Service plan recharged for ${customer.name}. Validity extended by ${rechargeDays} days.`,
+        description: `Service plan recharged for ${customer.name}. Service end date: ${endDateLabel}.`,
       });
       onSuccess();
       onClose();
@@ -162,20 +209,12 @@ export const RechargeAccessControlModal: React.FC<RechargeAccessControlModalProp
     }
   };
 
-  // 4. Handle Alert
-  const handleSendAlert = async () => {
+  const handleRetryNotice = async (noticeId: string) => {
     try {
       setLoading(true);
-      await sendRechargeDueAlert(customer._id, {
-        channel: "WhatsApp",
-        customMessage: customAlertMsg,
-      });
-
-      toast({
-        title: "WhatsApp Alert Sent",
-        description: `Payment & renewal alert dispatched to ${customer.name}.`,
-      });
-      onClose();
+      await retryRenewalNotice(customer._id, noticeId);
+      await loadNotices();
+      toast({ title: "Reminder queued", description: "The reminder will be retried by the scheduler." });
     } catch (err: any) {
       toast({
         title: "Alert Failed",
@@ -189,7 +228,7 @@ export const RechargeAccessControlModal: React.FC<RechargeAccessControlModalProp
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-2xl p-6">
+      <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-xl font-heading">
             <CreditCard className="w-5 h-5 text-primary" />
@@ -213,11 +252,13 @@ export const RechargeAccessControlModal: React.FC<RechargeAccessControlModalProp
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Plan: <b>{customer.rechargePlan?.planName || customer.package || "Retainer"}</b> • Retainer: ₹{Number(customer.rechargePlan?.monthlyAmount || customer.package || 0).toLocaleString("en-IN")}/mo
+              Plan: <b>{customer.rechargePlan?.planName || customer.package || "Retainer"}</b> • Retainer: {customer.rechargePlan?.monthlyAmount != null && Number.isFinite(Number(customer.rechargePlan.monthlyAmount)) ? `₹${Number(customer.rechargePlan.monthlyAmount).toLocaleString("en-IN")}/mo` : "Not set"}
             </p>
           </div>
 
           <div className="text-left sm:text-right shrink-0">
+            <p className="text-xs text-muted-foreground">Expiry Date</p>
+            <p className="text-sm font-semibold mb-2">{formatServiceExpiry(customer.rechargePlan?.validUntil)}</p>
             <span className="text-[11px] uppercase tracking-wider text-muted-foreground block font-bold">
               Validity Status
             </span>
@@ -226,7 +267,7 @@ export const RechargeAccessControlModal: React.FC<RechargeAccessControlModalProp
               <span>
                 {validUntil
                   ? isExpired
-                    ? "Expired / Overdue"
+                    ? (Date.now() < new Date(`${String(customer.rechargePlan.validUntil).slice(0, 10)}T00:00:00Z`).getTime() + 4 * 86400000 - 330 * 60000 ? "Grace period — portal access continues" : "Expired — grace period ended")
                     : `${daysRemaining} days left (${validUntil.toLocaleDateString("en-IN")})`
                   : "No expiry configured"}
               </span>
@@ -252,7 +293,7 @@ export const RechargeAccessControlModal: React.FC<RechargeAccessControlModalProp
             </TabsTrigger>
             <TabsTrigger value="alert">
               <Send className="w-4 h-4 mr-1.5" />
-              <span>Send WhatsApp Notice</span>
+              <span>Renewal Notices</span>
             </TabsTrigger>
           </TabsList>
 
@@ -271,47 +312,38 @@ export const RechargeAccessControlModal: React.FC<RechargeAccessControlModalProp
                 <label className="text-xs font-semibold text-foreground mb-1 block">Monthly Retainer Amount (₹)</label>
                 <Input
                   type="number"
+                  min="0"
                   value={monthlyAmount}
                   onChange={(e) => setMonthlyAmount(e.target.value)}
-                  placeholder="25000"
+                  placeholder="Not set"
                 />
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-foreground mb-2 block">Extend Validity Duration</label>
-              <div className="grid grid-cols-4 gap-2">
-                {[15, 30, 60, 90].map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setRechargeDays(d)}
-                    className={`p-2.5 rounded-xl border text-xs font-bold transition-all ${rechargeDays === d
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                        : "bg-background hover:bg-muted/50 border-input"
-                      }`}
-                  >
-                    +{d} Days
-                  </button>
-                ))}
-              </div>
+              <label htmlFor="service-end-date" className="text-xs font-semibold text-foreground mb-2 block">Service End Date</label>
+              <Input
+                id="service-end-date"
+                type="date"
+                required
+                value={serviceEndDate}
+                onChange={(event) => { setServiceEndDate(event.target.value); setConfirmPastDate(false); }}
+                aria-describedby="service-end-date-preview"
+              />
+              <p id="service-end-date-preview" className="mt-2 text-xs text-muted-foreground">
+                {isValidEndDate ? `Expiry Date: ${endDateLabel}` : "Choose the exact date to save as the service expiry date."}
+              </p>
+              {isValidEndDate && <p className="mt-2 text-xs text-muted-foreground">Portal access cutoff: {selectedCutoff} IST, including 3 grace days. Internal service delivery continues.</p>}
+              <p className="mt-2 text-xs text-muted-foreground">WhatsApp and email reminders: 7 days before, 3 days before, and expiry day at 9:00 AM IST.</p>
+              {isPastDate && <label className="mt-3 flex items-start gap-2 text-xs text-amber-700"><input type="checkbox" checked={confirmPastDate} onChange={event => setConfirmPastDate(event.target.checked)} />I understand this date is in the past and portal access may be held immediately if the grace period has ended.</label>}
             </div>
 
-            {isLocked && (
-              <label className="flex items-center gap-2 text-xs font-medium cursor-pointer p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900">
-                <input
-                  type="checkbox"
-                  checked={autoUnlockOnRecharge}
-                  onChange={(e) => setAutoUnlockOnRecharge(e.target.checked)}
-                  className="rounded text-emerald-600"
-                />
-                <span>Automatically unlock portal access & restore active marketing services</span>
-              </label>
-            )}
+            {isLocked && customer.accessControl?.holdType === 'EXPIRY' && <p className="text-xs text-emerald-700">Renewal restores portal access automatically when the new date is within its active or grace period.</p>}
+            {isLocked && customer.accessControl?.holdType !== 'EXPIRY' && <p className="text-xs text-amber-700">This is a manual or payment hold. Renewal will preserve it; an authorized manager must review it separately.</p>}
 
             <Button
               onClick={handleRecharge}
-              disabled={loading}
+              disabled={loading || !isValidEndDate || (isPastDate && !confirmPastDate)}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11"
             >
               {loading ? (
@@ -322,7 +354,7 @@ export const RechargeAccessControlModal: React.FC<RechargeAccessControlModalProp
               ) : (
                 <>
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Confirm Recharge (+{rechargeDays} Days)
+                  {isValidEndDate ? `Confirm Recharge (${endDateLabel})` : "Select Service End Date"}
                 </>
               )}
             </Button>
@@ -426,42 +458,19 @@ export const RechargeAccessControlModal: React.FC<RechargeAccessControlModalProp
             )}
           </TabsContent>
 
-          {/* TAB 3: WHATSAPP DUE ALERT */}
           <TabsContent value="alert" className="space-y-4 pt-3">
-            <p className="text-xs text-muted-foreground">
-              Dispatches an automated payment due and retainer renewal notice via WhatsApp to the client's registered contact number ({customer.contactNumbers?.[0] || customer.phone || "No phone"}).
-            </p>
-
-            <div>
-              <label className="text-xs font-semibold text-foreground mb-1 block">
-                Custom Alert Note (Optional - overrides default notice)
-              </label>
-              <textarea
-                rows={4}
-                value={customAlertMsg}
-                onChange={(e) => setCustomAlertMsg(e.target.value)}
-                placeholder="Leave blank to use the standard high-priority renewal notice with exact outstanding amount and bank details..."
-                className="w-full p-2.5 rounded-md border border-input bg-background text-xs"
-              />
+            <p className="text-xs text-muted-foreground">WhatsApp and email reminders are scheduled at 9:00 AM IST, 7 days before, 3 days before, and on expiry day. Changing expiry replaces pending reminders. Sent means accepted by the provider; WhatsApp delivery/read status updates when a webhook arrives.</p>
+            <Button variant="outline" onClick={loadNotices} disabled={noticeLoading}>{noticeLoading ? "Refreshing…" : "Refresh Status"}</Button>
+            {noticeError && <p role="alert" className="text-xs text-destructive">{noticeError}</p>}
+            {!noticeLoading && !noticeError && notices.length === 0 && <p className="text-xs text-muted-foreground">No reminders scheduled. Save a Service End Date to schedule them.</p>}
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {notices.map(notice => <div key={notice._id} className="rounded-lg border p-3 text-xs space-y-1">
+                <div className="flex flex-wrap items-center justify-between gap-2"><b>{notice.channel} · {notice.daysBefore === 0 ? "Expiry day" : `${notice.daysBefore} days before`}</b><Badge variant="outline">{notice.status}</Badge></div>
+                <p>{new Date(notice.dueAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</p>
+                {notice.error && <p className="text-muted-foreground">{notice.error}</p>}
+                {notice.status === 'Failed' && <Button size="sm" variant="outline" onClick={() => handleRetryNotice(notice._id)} disabled={loading}>Retry</Button>}
+              </div>)}
             </div>
-
-            <Button
-              onClick={handleSendAlert}
-              disabled={loading}
-              className="w-full bg-[#25D366] hover:bg-[#1EBE5D] text-slate-950 font-bold h-11"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Sending WhatsApp Notice...
-                </>
-              ) : (
-                <>
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  Dispatch WhatsApp Renewal Notice
-                </>
-              )}
-            </Button>
           </TabsContent>
         </Tabs>
       </DialogContent>

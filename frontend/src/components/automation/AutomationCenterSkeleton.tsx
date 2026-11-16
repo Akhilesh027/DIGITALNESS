@@ -1,3 +1,4 @@
+import { useToast } from "@/hooks/use-toast";
 import React, { useState, useEffect } from "react";
 import {
   Cpu,
@@ -247,6 +248,7 @@ export const AutomationCenterSkeleton: React.FC<AutomationCenterProps> = ({ cust
             ))}
           </div>
         </div>
+      )}
       {/* SUB-NAVIGATION TABS */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
         <button

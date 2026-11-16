@@ -24,11 +24,13 @@ const getRoleFilter = async (user) => {
 
 exports.getMyAttendance = async (req, res) => {
   try {
-    const { fromDate, toDate } = req.query;
+    const { fromDate, toDate, date } = req.query;
 
     const filter = { employee: getUserId(req.user) };
 
-    if (fromDate || toDate) {
+    if (date) {
+      filter.date = normalizeDate(date);
+    } else if (fromDate || toDate) {
       filter.date = {};
       if (fromDate) filter.date.$gte = normalizeDate(fromDate);
       if (toDate) filter.date.$lte = normalizeDate(toDate);
@@ -50,14 +52,16 @@ exports.getMyAttendance = async (req, res) => {
 
 exports.getAllAttendance = async (req, res) => {
   try {
-    const { employeeId, fromDate, toDate, status } = req.query;
+    const { employeeId, fromDate, toDate, date, status } = req.query;
 
     const filter = await getRoleFilter(req.user);
 
     if (employeeId) filter.employee = employeeId;
     if (status) filter.status = status;
 
-    if (fromDate || toDate) {
+    if (date) {
+      filter.date = normalizeDate(date);
+    } else if (fromDate || toDate) {
       filter.date = {};
       if (fromDate) filter.date.$gte = normalizeDate(fromDate);
       if (toDate) filter.date.$lte = normalizeDate(toDate);
@@ -99,9 +103,10 @@ exports.getTodayAttendance = async (req, res) => {
 
 exports.getAttendanceStats = async (req, res) => {
   try {
-    const today = normalizeDate();
+    const { date } = req.query;
+    const targetDate = date ? normalizeDate(date) : normalizeDate();
     const filter = await getRoleFilter(req.user);
-    filter.date = today;
+    filter.date = targetDate;
 
     const attendance = await Attendance.find(filter);
 

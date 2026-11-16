@@ -95,12 +95,13 @@ app.use(
 );
 app.set("io", io);
 
+io.use(require('./middleware/socketAccess').authenticateSocket);
 io.on("connection", (socket) => {
   console.log("Socket connected:", socket.id);
 
-  socket.on("join_customer_room", (customerId) => {
-    socket.join(`customer_${customerId}`);
-    console.log(`Joined room: customer_${customerId}`);
+  socket.on("join_customer_room", async (customerId) => {
+    try { if (!await require('./middleware/socketAccess').joinCustomer(socket, customerId)) socket.emit('access_denied', { message: 'Customer event access denied' }); }
+    catch { socket.emit('access_denied', { message: 'Unable to authorize event subscription' }); }
   });
 
   socket.on("leave_customer_room", (customerId) => {
@@ -120,6 +121,9 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use('/api/service-access', require('./routes/serviceAccessRoutes'));
+app.use('/api/service-workspace', require('./routes/serviceWorkspaceRoutes'));
+app.use('/api/admin', require('./middleware/authMiddleware').protect, require('./services/servicePermissions').requireAdmin);
 app.use("/api/users", authRoutes);
 app.use("/api/leads", leadRoutes);
 app.post("/api/contact", require("./controllers/leadController.js").createPublicWebsiteLead);
@@ -141,6 +145,7 @@ app.use("/api/tickets", require("./routes/ticketRoutes.js")); app.use(
 app.use('/api/daily-updates', dailyUpdateRoutes);
 app.use("/api/client-attachments", clientAttachmentRoutes);
 app.use("/api/reports", require("./routes/reportRoutes"));
+app.use("/api/dashboard", require("./routes/dashboardRoutes"));
 app.use("/api/blogs", require("./routes/blogRoutes.js"));
 app.use("/api/certificates", require("./routes/certificateRoutes.js"));
 app.use("/api/upload", require("./routes/uploadRoutes.js"));
@@ -459,6 +464,7 @@ mongoose
 const gracefulShutdown = async (signal) => {
   console.log(`\n[Server] Received ${signal}. Shutting down gracefully...`);
   try {
+    AutomationScheduler.stop();
     const QueueRegistry = require("./ai/queue/QueueRegistry");
     const { closeRedis } = require("./config/redis");
 

@@ -44,6 +44,7 @@ interface CreativeStudioVisualEditorProps {
   onSaveVersion: (newVersionData: any) => Promise<void>;
   onSubmitApproval: (id: string) => Promise<void>;
   onApprove: (id: string) => Promise<void>;
+  onGenerateWithOpenAI?: (prompt: string) => void;
 }
 
 // Helpers for Date & Time
@@ -74,6 +75,7 @@ export const CreativeStudioVisualEditor: React.FC<CreativeStudioVisualEditorProp
   onSaveVersion,
   onSubmitApproval,
   onApprove,
+  onGenerateWithOpenAI,
 }) => {
   const { toast } = useToast();
   const latestVersion = project?.versions?.[project?.versions?.length - 1];
@@ -82,27 +84,27 @@ export const CreativeStudioVisualEditor: React.FC<CreativeStudioVisualEditorProp
 
   // Editable Canvas State (Dynamically initialized from project & version)
   const [headline, setHeadline] = useState(
-    latestVersion?.headline || project?.headline || "DIVINE BLESSINGS OF LORD GANESHA"
+    latestVersion?.headline || project?.headline || ""
   );
   const [subheadline, setSubheadline] = useState(
     latestVersion?.subheadline ||
       project?.subheadline ||
-      "May Lord Ganesha bless every new beginning with wisdom, prosperity, and boundless success."
+      ""
   );
   const [offerText, setOfferText] = useState(
-    latestVersion?.offerText || project?.offerText || "FESTIVE CELEBRATION SPECIAL"
+    latestVersion?.offerText || project?.offerText || ""
   );
   const [ctaText, setCtaText] = useState(
-    latestVersion?.ctaText || project?.ctaText || "Warm Festive Greetings"
+    latestVersion?.ctaText || project?.ctaText || ""
   );
   const [phone, setPhone] = useState(
-    latestVersion?.phone || customer?.contactNumbers?.[0] || customer?.phone || "+91 98765 43214"
+    latestVersion?.phone || customer?.contactNumbers?.[0] || customer?.phone || ""
   );
   const [website, setWebsite] = useState(
     latestVersion?.website || customer?.website || ""
   );
   const [locationName, setLocationName] = useState(
-    latestVersion?.locationName || customer?.city || "Hyderabad HQ"
+    latestVersion?.locationName || customer?.city || ""
   );
   const [layoutTheme, setLayoutTheme] = useState<string>(
     latestVersion?.layoutTheme || project?.layoutTheme || "gold_luxury"
@@ -171,16 +173,16 @@ export const CreativeStudioVisualEditor: React.FC<CreativeStudioVisualEditorProp
   const [aiPrompt, setAiPrompt] = useState(
     latestVersion?.prompt ||
       project?.aiPrompt ||
-      "Beautifully sculpted traditional Indian Lord Ganesha idol, graceful divine and peaceful posture, authentic devotional aesthetics, resting on an elevated traditional carved teakwood pedestal. Delicate fresh orange marigold garlands, white jasmine flowers, polished brass diya oil lamps with glowing warm flames, subtle brass thali accents arranged naturally around the base. Soft warm ivory to subtle golden amber gradient background with understated temple arch silhouette and faint mandala motifs. Soft warm golden illumination, gentle diya glow, volumetric golden light rays, delicate cinematic rim lighting around Lord Ganesha, natural brass highlights, Hasselblad H6D-100c medium format, 85mm f/1.4 luxury commercial prime lens, shallow depth of field, creamy background bokeh, ultra-sharp focus on subject, cinematic 3-point studio lighting, photorealistic 8k render"
+      "Create a professional background for the client brand and its actual services, with clean space for editable text."
   );
   const [isRegeneratingBg, setIsRegeneratingBg] = useState(false);
 
   // Social Captions & Hashtags State
-  const defaultCaptionText = `✨ **${headline}** ✨\n\n${subheadline}\n\n🌟 **Why Choose ${customer?.name || "Us"}:**\n• Premium Quality & Certified Excellence\n• Tailored Solutions & Dedicated Support\n• Limited-Time Exclusive Privilege\n\n📍 **Location:** ${locationName}\n📞 **Direct Line:** ${phone}${website ? `\n🌐 **Official Website:** ${website}` : ""}\n\n👉 **${ctaText} — Tap the link in bio to get started!**`;
+  const defaultCaptionText = latestVersion?.caption || project?.brandContext?.communication?.caption || [headline, subheadline, ctaText, website].filter(Boolean).join("\n\n");
 
   const [socialCaption, setSocialCaption] = useState(defaultCaptionText);
   const [socialHashtags, setSocialHashtags] = useState(
-    `#${(customer?.name || "Brand").replace(/[^a-zA-Z0-9]/g, "")} #${(customer?.industry || "Business").replace(/[^a-zA-Z0-9]/g, "")} #SpecialOffer #FestivalOffer #Trending #HyderabadBusiness #TopBrand #Marketing`
+    `#${(customer?.name || "Brand").replace(/[^a-zA-Z0-9]/g, "")} #${(customer?.industry || "Business").replace(/[^a-zA-Z0-9]/g, "")} #Marketing`
   );
 
   // Scheduling Modal State
@@ -268,44 +270,11 @@ export const CreativeStudioVisualEditor: React.FC<CreativeStudioVisualEditorProp
     }
   }, [isScheduleOpen, headline, subheadline, ctaText, locationName, phone, website]);
 
-  // Regenerate Hero Visual via Pollinations AI
+  // Open a new reviewed OpenAI generation; preserve the original project.
   const handleRegenerateBackground = async () => {
     if (!aiPrompt.trim()) return;
-    try {
-      setIsRegeneratingBg(true);
-      const seed = Math.floor(Math.random() * 1000000);
-      const cleanPrompt = encodeURIComponent(
-        `${aiPrompt}, commercial advertising photography, cinematic studio lighting, 8k resolution, photorealistic, clean negative space, no text, no words, no letters, no watermark`
-      );
-      const newUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=1080&height=1080&model=flux&nologo=true&seed=${seed}`;
-
-      // Preload image
-      const img = new Image();
-      img.src = newUrl;
-      img.onload = () => {
-        setBgImageUrl(newUrl);
-        setIsRegeneratingBg(false);
-        toast({
-          title: "✨ Visual Background Regenerated",
-          description: "New AI hero visual loaded into the canvas.",
-        });
-      };
-      img.onerror = () => {
-        setIsRegeneratingBg(false);
-        toast({
-          title: "Generation Notice",
-          description: "Applied generated visual link to canvas.",
-        });
-        setBgImageUrl(newUrl);
-      };
-    } catch (err: any) {
-      setIsRegeneratingBg(false);
-      toast({
-        title: "Regeneration Error",
-        description: err.message,
-        variant: "destructive",
-      });
-    }
+    if (onGenerateWithOpenAI) onGenerateWithOpenAI(aiPrompt);
+    else toast({ title: "Open Creative Studio", description: "Use Generate with OpenAI to create a new image variation.", variant: "destructive" });
   };
 
   // Download Canvas as SVG
@@ -1054,7 +1023,7 @@ export const CreativeStudioVisualEditor: React.FC<CreativeStudioVisualEditorProp
                 ) : (
                   <>
                     <Sparkles className="w-3.5 h-3.5" aria-hidden="true" focusable="false" />
-                    <span>Regenerate Hero Artwork with Complete Prompt →</span>
+                    <span>Create a new OpenAI image variation →</span>
                   </>
                 )}
               </Button>

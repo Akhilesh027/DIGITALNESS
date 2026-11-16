@@ -44,10 +44,12 @@ import {
   generateAICreative,
   synthesizeAICreativePrompt,
   requestAICreativeRevision,
+  getOpenAIStudioStatus,
 } from "../api/creativeProjectApi";
 import { getCustomers } from "../api/customerApi";
 
 const OCCASION_PRESETS = [
+  { label: "Brand services & business promotion", value: "Brand services" },
   { label: "🪔 Diwali Festival of Lights Special", value: "Diwali" },
   { label: "🐘 Ganesh Chaturthi / Vinayaka Chavithi", value: "Ganesh Chaturthi" },
   { label: "🌙 Eid Mubarak & Festive Blessings", value: "Eid Mubarak" },
@@ -75,13 +77,16 @@ export default function CreativeStudioPage() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [generatorStep, setGeneratorStep] = useState<"INPUT" | "PROMPT_REVIEW">("INPUT");
   const [aiCustomerId, setAiCustomerId] = useState("");
-  const [aiOccasion, setAiOccasion] = useState(OCCASION_PRESETS[1].value); // Default to Ganesh Chaturthi
+  const [aiOccasion, setAiOccasion] = useState(OCCASION_PRESETS[0].value);
   const [aiTheme, setAiTheme] = useState<string>("gold_luxury");
   const [aiCustomPrompt, setAiCustomPrompt] = useState("");
   const [isSynthesizingPrompt, setIsSynthesizingPrompt] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [synthesizedBrief, setSynthesizedBrief] = useState<any>(null);
   const [editedPrompt, setEditedPrompt] = useState("");
+  const [openAIStatus, setOpenAIStatus] = useState<any>(null);
+  const [generatorError, setGeneratorError] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   // Manual Project Creation Modal State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -104,6 +109,7 @@ export default function CreativeStudioPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setLoadError("");
       const [creativeData, customerData] = await Promise.all([
         getCreativeProjects(),
         getCustomers(),
@@ -111,6 +117,7 @@ export default function CreativeStudioPage() {
       setProjects(creativeData || []);
       setCustomers(customerData || []);
     } catch (err: any) {
+      setLoadError(err.message || 'Could not load Creative Studio.');
       toast({ title: "Error", description: err.message || "Failed to load creative studio", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -119,6 +126,7 @@ export default function CreativeStudioPage() {
 
   useEffect(() => {
     fetchData();
+    getOpenAIStudioStatus().then(setOpenAIStatus).catch(error => setGeneratorError(error.message));
   }, []);
 
   // STEP 1: Synthesize AI Creative Prompt & Strategy
@@ -130,10 +138,13 @@ export default function CreativeStudioPage() {
 
     try {
       setIsSynthesizingPrompt(true);
+      setGeneratorError("");
       const res = await synthesizeAICreativePrompt({
         customerId: aiCustomerId,
         occasion: aiOccasion,
         customPrompt: aiCustomPrompt || undefined,
+        provider: 'openai',
+        theme: aiTheme,
       });
 
       if (res.data) {
@@ -146,6 +157,7 @@ export default function CreativeStudioPage() {
         });
       }
     } catch (err: any) {
+      setGeneratorError(err.message || 'OpenAI prompt generation failed.');
       toast({ title: "Synthesis Failed", description: err.message || "Could not synthesize prompt", variant: "destructive" });
     } finally {
       setIsSynthesizingPrompt(false);
@@ -157,60 +169,16 @@ export default function CreativeStudioPage() {
     if (!aiCustomerId) return;
     try {
       setAiGenerating(true);
-      const res = await generateAICreative({
-        customerId: aiCustomerId,
-        occasion: aiOccasion,
-        customPrompt: editedPrompt || aiCustomPrompt || undefined,
-      });
-
-      toast({
-        title: "🎨 Poster Generated Successfully!",
-        description: res.data?.title || "Your AI advertising poster has been rendered.",
-      });
-
-      setIsAiModalOpen(false);
-      setGeneratorStep("INPUT");
-
-      const updatedProjects = await getCreativeProjects();
-      setProjects(updatedProjects || []);
-
-      const returnedProject = res.data?.project;
-      const heroImg = res.data?.asset?.renderSettings?.heroImageUrl;
-      
-      const targetProj = returnedProject || updatedProjects?.find(
-        (p: any) => p._id === res.data?.project?._id || p.title === res.data?.project?.title
-      );
-
-      if (targetProj) {
-        targetProj.layoutTheme = aiTheme || synthesizedBrief?.layoutTheme || "gold_luxury";
-        if (heroImg) {
-          targetProj.bgImageUrl = heroImg;
-          if (targetProj.versions?.length > 0) {
-            targetProj.versions[targetProj.versions.length - 1].bgImageUrl = heroImg;
-            targetProj.versions[targetProj.versions.length - 1].layoutTheme = targetProj.layoutTheme;
-          }
-        }
-        if (synthesizedBrief?.communication?.headline) {
-          targetProj.headline = synthesizedBrief.communication.headline;
-        }
-        if (synthesizedBrief?.communication?.supportingLine) {
-          targetProj.subheadline = synthesizedBrief.communication.supportingLine;
-        }
-        if (synthesizedBrief?.communication?.cta) {
-          targetProj.ctaText = synthesizedBrief.communication.cta;
-        }
-        if (synthesizedBrief?.communication?.offerText) {
-          targetProj.offerText = synthesizedBrief.communication.offerText;
-        }
-        if (synthesizedBrief?.communication?.caption) {
-          targetProj.caption = synthesizedBrief.communication.caption;
-        }
-        setSelectedProject({ ...targetProj });
-      }
-
-      setSynthesizedBrief(null);
-      setAiCustomPrompt("");
+      setGeneratorError("");
+      const res = await generateAICreative({ customerId: aiCustomerId, occasion: aiOccasion, customPrompt: editedPrompt, provider: 'openai', draftId: synthesizedBrief?.draftId });
+      if (!res.data?.project?._id || !res.data?.asset?.assetUrl) throw new Error('OpenAI generation did not return a saved image project.');
+      toast({ title: "OpenAI image saved", description: `${res.data.imageModel} · Review the draft and editable copy before approval.` });
+      setIsAiModalOpen(false); setGeneratorStep('INPUT');
+      await fetchData();
+      setSelectedProject(res.data.project);
+      setSynthesizedBrief(null); setAiCustomPrompt('');
     } catch (err: any) {
+      setGeneratorError(err.message || "OpenAI image generation failed.");
       toast({ title: "Generation Failed", description: err.message || "Could not generate creative", variant: "destructive" });
     } finally {
       setAiGenerating(false);
@@ -262,7 +230,7 @@ export default function CreativeStudioPage() {
         title: newTitle,
         customerId: newCustomerId,
         assetType: newAssetType,
-        fileUrl: newFileUrl || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop",
+        fileUrl: newFileUrl || undefined,
         aiPrompt: newPrompt,
       });
 
@@ -341,12 +309,13 @@ export default function CreativeStudioPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
+      {loadError && <div role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{loadError}<Button variant="link" onClick={fetchData}>Retry</Button></div>}
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 p-6 rounded-2xl text-white shadow-xl">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Badge className="bg-purple-500/30 text-purple-200 border-purple-400/40 text-xs font-semibold px-2.5 py-0.5">
-              <Sparkles className="h-3 w-3 mr-1" /> Autonomous Creative Studio
+              <Sparkles className="h-3 w-3 mr-1" /> OpenAI Creative Studio
             </Badge>
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
@@ -366,6 +335,7 @@ export default function CreativeStudioPage() {
           <Dialog
             open={isAiModalOpen}
             onOpenChange={(open) => {
+              if (isSynthesizingPrompt || aiGenerating) return;
               setIsAiModalOpen(open);
               if (!open) {
                 setGeneratorStep("INPUT");
@@ -376,7 +346,7 @@ export default function CreativeStudioPage() {
             <DialogTrigger asChild>
               <Button size="sm" className="gap-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold shadow-lg shadow-purple-500/25">
                 <Wand2 className="h-4 w-4" aria-hidden="true" focusable="false" />
-                <span>Instant AI Poster Generator</span>
+                <span>Generate with OpenAI</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[680px] max-h-[92vh] overflow-y-auto">
@@ -400,6 +370,9 @@ export default function CreativeStudioPage() {
                     : "Inspect the generated visual prompt, copy package, and brand rules before rendering the poster."}
                 </DialogDescription>
               </DialogHeader>
+              <p className="text-xs text-slate-600">OpenAI API · Prompt: {openAIStatus?.textModel || 'loading…'} · Image: {openAIStatus?.imageModel || 'loading…'}. Images are generated at 1024×1024; copy stays editable in the poster canvas.</p>
+              {openAIStatus && !openAIStatus.configured && <p role="alert" className="text-sm text-red-700">Configure OPENAI_API_KEY in the backend to generate prompts and images.</p>}
+              {generatorError && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">{generatorError}</p>}
 
               {/* STEP 1: CONTEXT INGESTION & SELECTION */}
               {generatorStep === "INPUT" && (
@@ -409,7 +382,7 @@ export default function CreativeStudioPage() {
                     <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block mb-1.5">
                       Target Client Brand *
                     </label>
-                    <Select value={aiCustomerId} onValueChange={setAiCustomerId}>
+                    <Select value={aiCustomerId} disabled={isSynthesizingPrompt || aiGenerating} onValueChange={value => { setAiCustomerId(value); setSynthesizedBrief(null); setEditedPrompt(''); setGeneratorError(''); }}>
                       <SelectTrigger className="w-full bg-slate-50 border-slate-300">
                         <SelectValue placeholder="Select Client Brand from CRM" />
                       </SelectTrigger>
@@ -504,7 +477,7 @@ export default function CreativeStudioPage() {
                   {/* Step 1 Synthesize Button */}
                   <Button
                     onClick={handleSynthesizePrompt}
-                    disabled={isSynthesizingPrompt || !aiCustomerId}
+                    disabled={isSynthesizingPrompt || !aiCustomerId || !openAIStatus?.configured}
                     className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-2.5 shadow-md flex items-center justify-center gap-2"
                   >
                     {isSynthesizingPrompt ? (
@@ -539,7 +512,7 @@ export default function CreativeStudioPage() {
                         )}
                       </div>
                       <span className="text-xs font-black text-amber-300">
-                        {synthesizedBrief.creativeConcept?.name || "DIVINE BEGINNINGS"}
+                        {synthesizedBrief.creativeConcept?.name || "Creative concept"}
                       </span>
                     </div>
                     <p className="text-xs text-slate-300 font-medium leading-relaxed">
@@ -688,18 +661,18 @@ export default function CreativeStudioPage() {
 
                     <Button
                       onClick={handleGeneratePosterFromPrompt}
-                      disabled={aiGenerating || !editedPrompt.trim()}
+                      disabled={aiGenerating || !editedPrompt.trim() || synthesizedBrief.customerId !== aiCustomerId || !openAIStatus?.configured}
                       className="flex-1 bg-gradient-to-r from-purple-600 via-indigo-600 to-emerald-600 hover:from-purple-700 hover:to-emerald-700 text-white font-bold py-2.5 shadow-md flex items-center justify-center gap-2"
                     >
                       {aiGenerating ? (
                         <>
                           <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" focusable="false" />
-                          <span>Generating 1080×1080 Poster Artwork...</span>
+                          <span>Generating OpenAI image…</span>
                         </>
                       ) : (
                         <>
                           <Sparkles className="h-4 w-4" aria-hidden="true" focusable="false" />
-                          <span>Generate Poster with This Prompt (1080×1080) →</span>
+                          <span>Generate OpenAI image and save draft →</span>
                         </>
                       )}
                     </Button>
@@ -990,6 +963,11 @@ export default function CreativeStudioPage() {
                 customers.find((c) => c._id === aiCustomerId)
               }
               onClose={() => setSelectedProject(null)}
+              onGenerateWithOpenAI={(prompt) => {
+                setAiCustomerId(selectedProject.customerId?._id || selectedProject.customerId);
+                setAiOccasion('Creative variation'); setAiCustomPrompt(prompt); setGeneratorStep('INPUT'); setSynthesizedBrief(null); setGeneratorError('');
+                setSelectedProject(null); setIsAiModalOpen(true);
+              }}
               onSaveVersion={async (versionData) => {
                 const res = await addCreativeVersion(selectedProject._id, versionData);
                 if (res?.project) {

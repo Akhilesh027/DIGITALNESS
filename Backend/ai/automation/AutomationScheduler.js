@@ -36,6 +36,9 @@ class AutomationScheduler {
       this.runJob("ADS_WATCHER");
     }, 6 * 60 * 60 * 1000);
     this.intervals.push(adsInterval);
+    const renewals = () => require('../../services/renewalService').tick().catch(error => console.error('[Renewal Scheduler]', error.message));
+    renewals();
+    this.intervals.push(setInterval(renewals, 60000));
   }
 
   /**

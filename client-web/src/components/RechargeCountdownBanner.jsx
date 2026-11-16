@@ -17,11 +17,14 @@ export const RechargeCountdownBanner = () => {
 
   let daysRemaining = null;
   let isExpired = false;
+  let inGrace = false;
 
   if (validUntil) {
-    const diffMs = validUntil.getTime() - Date.now();
+    const expiryEnd = Date.parse(`${String(rechargePlan.validUntil).slice(0, 10)}T00:00:00Z`) + 86400000 - 330 * 60000;
+    const diffMs = expiryEnd - Date.now();
     daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
     isExpired = daysRemaining <= 0;
+    inGrace = isExpired && Date.now() < expiryEnd + 3 * 86400000;
   }
 
   // Grace / Expired state
@@ -35,10 +38,10 @@ export const RechargeCountdownBanner = () => {
               <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
             </span>
             <span className="font-bold text-amber-300">
-              {isExpired ? "Service Retainer Expired" : daysRemaining !== null && daysRemaining <= 3 ? `Service Renewal Due in ${daysRemaining} Day${daysRemaining === 1 ? "" : "s"}` : "Payment Overdue Alert"}
+              {inGrace ? "Renewal grace period — portal access continues" : isExpired ? "Service Retainer Expired" : daysRemaining !== null && daysRemaining <= 3 ? `Service Renewal Due in ${daysRemaining} Day${daysRemaining === 1 ? "" : "s"}` : "Payment Overdue Alert"}
             </span>
             <span className="hidden md:inline text-slate-300">
-              {validUntil ? `Valid until ${validUntil.toLocaleDateString("en-IN")}` : "Renewal required"}
+              {validUntil ? `Expiry Date: ${String(rechargePlan.validUntil).slice(0, 10)} · 3-day grace period` : "Renewal required"}
               {pendingAmount > 0 && ` • Outstanding: ₹${pendingAmount.toLocaleString("en-IN")}`}
             </span>
           </div>

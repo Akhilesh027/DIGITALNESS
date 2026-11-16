@@ -17,19 +17,19 @@ router.get("/my", getMyAttendance);
 
 router.get(
   "/today",
-  authorize("Admin", "Operational Manager"),
+  authorize("Admin", "admin", "Operational Manager", "Branch Manager"),
   getTodayAttendance
 );
 
 router.get(
   "/stats",
-  authorize("Admin", "Operational Manager"),
+  authorize("Admin", "admin", "Operational Manager", "Branch Manager"),
   getAttendanceStats
 );
 
 router.get(
   "/",
-  authorize("Admin", "Operational Manager"),
+  authorize("Admin", "admin", "Operational Manager", "Branch Manager"),
   getAllAttendance
 );
 

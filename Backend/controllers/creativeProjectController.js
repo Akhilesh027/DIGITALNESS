@@ -14,9 +14,15 @@ const safeAuditLog = async (data) => {
 exports.getCreativeProjects = async (req, res) => {
   try {
     const { customerId, clientLocationId, approvalStatus, assetType } = req.query;
-    let filter = {};
+    const studio = require('../ai/creative/OpenAIStudioService');
+    const scope = studio.customerFilter(req.user);
+    const allowedCustomers = await Customer.find(scope).select('_id').lean();
+    let filter = { customerId: { $in: allowedCustomers.map(c => c._id) } };
 
-    if (customerId) filter.customerId = customerId;
+    if (customerId) {
+      if (!allowedCustomers.some(c => String(c._id) === String(customerId))) return res.status(404).json({ success: false, message: 'Customer not found.' });
+      filter.customerId = customerId;
+    }
     if (clientLocationId) filter.clientLocationId = clientLocationId;
     if (approvalStatus) filter.approvalStatus = approvalStatus;
     if (assetType) filter.assetType = assetType;

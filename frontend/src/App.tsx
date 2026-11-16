@@ -8,6 +8,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
+import MyServicesPage from './pages/MyServicesPage';
 import LeadsPage from "./pages/LeadsPage";
 import CustomersPage from "./pages/CustomersPage";
 import WorksPage from "./pages/WorksPage";
@@ -141,6 +142,7 @@ const App = () => (
               }
             >
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/my-services" element={<MyServicesPage />} />
               <Route path="/employees" element={<EmployeesPage />} />
               <Route path="/leads" element={<LeadsPage />} />
               <Route path="/customers" element={<CustomersPage />} />
@@ -157,13 +159,13 @@ const App = () => (
               <Route path="/proposals" element={<ProposalsPage />} />
               <Route path="/branches" element={<BranchesPage />} />
               <Route path="/AttendancePage" element={<AttendancePage />} />
+              <Route path="/attendance" element={<AttendancePage />} />
 
               <Route path="/daily-update" element={<EmployeeDailyUpdate />} />
               <Route
                 path="/admin/daily-updates"
                 element={<AdminDailyUpdates />}
               />
-              <Route path="/daily-update" element={<EmployeeDailyUpdate />} />
               <Route
                 path="/daily-updates-review"
                 element={<AdminDailyUpdates />}
@@ -225,19 +227,7 @@ const App = () => (
               <Route path="/executive-dashboard" element={<AgencyExecutiveDashboard />} />
               <Route path="/client-reporting" element={<ClientReportingWorkspace />} />
               <Route path="/system/certification" element={<ProductionCertificationDashboard />} />
-              <Route
-                path="/creative-studio"
-                element={
-                  <UpcomingFeatureGuard
-                    title="AI Creative Studio"
-                    category="Visual Asset Generator"
-                    description="Autonomous prompt-to-banner design, Canva asset generation, brand-safe palette styling, and one-click cloud publishing."
-                    highlights={["One-click ad creatives & carousel banners", "Multi-aspect ratio rendering (1:1, 9:16)", "Direct Cloudinary asset storage"]}
-                  >
-                    <CreativeStudioPage />
-                  </UpcomingFeatureGuard>
-                }
-              />
+              <Route path="/creative-studio" element={<CreativeStudioPage />} />
               <Route
                 path="/scheduler"
                 element={
@@ -278,32 +268,8 @@ const App = () => (
                   </UpcomingFeatureGuard>
                 }
               />
-              <Route
-                path="/ads"
-                element={
-                  <UpcomingFeatureGuard
-                    title="AI Ad Operations & Spend Lock"
-                    category="Meta & Google Performance Ads"
-                    description="Unified ad campaign builder, real-time ROAS tracker, and emergency spending kill-switches across Meta and Google Ads."
-                    highlights={["Emergency spend & write safety locks", "Meta & Google Ads sync", "Automated audience cohort optimization"]}
-                  >
-                    <AdCampaignsPage />
-                  </UpcomingFeatureGuard>
-                }
-              />
-              <Route
-                path="/ad-campaigns"
-                element={
-                  <UpcomingFeatureGuard
-                    title="AI Ad Operations & Spend Lock"
-                    category="Meta & Google Performance Ads"
-                    description="Unified ad campaign builder, real-time ROAS tracker, and emergency spending kill-switches across Meta and Google Ads."
-                    highlights={["Emergency spend & write safety locks", "Meta & Google Ads sync", "Automated audience cohort optimization"]}
-                  >
-                    <AdCampaignsPage />
-                  </UpcomingFeatureGuard>
-                }
-              />
+              <Route path="/ads" element={<AdCampaignsPage />} />
+              <Route path="/ad-campaigns" element={<AdCampaignsPage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />

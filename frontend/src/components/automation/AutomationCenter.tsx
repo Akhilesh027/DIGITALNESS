@@ -279,7 +279,7 @@ export const AutomationCenter: React.FC<AutomationCenterProps> = ({ customers = 
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1">
-                    <span className="text-xs font-bold text-slate-900 block">{policy.title}</span>
+                    <span className="text-xs font-bold text-slate-900 block">{policy.name}</span>
                     <p className="text-[11px] text-slate-500 leading-relaxed">{policy.description}</p>
                   </div>
                   <Badge className={`text-[10px] font-semibold ${getModeBadgeClass(policy.mode)}`}>

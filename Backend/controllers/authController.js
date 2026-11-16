@@ -275,6 +275,8 @@ exports.loginUser = async (req, res) => {
         designation: user.designation,
         branchId: user.branchId,
         status: userStatus,
+        serviceGrants: user.serviceGrants || [],
+        accessVersion: user.accessVersion || 0,
       },
       attendance,
       token: generateToken(user._id),
@@ -378,6 +380,11 @@ exports.updateUser = async (req, res) => {
     }
 
     const updates = { ...req.body };
+    if (Object.keys(updates).some(key => ['serviceGrants', 'accessVersion'].includes(key) || key.includes('.') || key.startsWith('$'))) return res.status(400).json({ message: 'Use the employee access editor to change permissions' });
+    if (require('../services/servicePermissions').scope(req.user).kind !== 'company') {
+      const selfFields = ['name', 'phone', 'alternatePhone', 'address', 'city', 'state', 'profileImage', 'emergencyContact'];
+      if (String(getUserId(req.user)) !== String(existingUser._id) || Object.keys(updates).some(key => !selfFields.includes(key))) return res.status(403).json({ message: 'Only an administrator can manage employee security and employment fields' });
+    }
 
     delete updates._id;
     delete updates.id;

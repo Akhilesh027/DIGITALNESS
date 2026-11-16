@@ -5,4 +5,5 @@ const SOCKET_URL = rawUrl.replace(/\/api\/?$/, "");
 
 export const socket = io(SOCKET_URL, {
   autoConnect: false,
+  auth: callback => callback({ token: localStorage.getItem('token') || localStorage.getItem('authToken') || localStorage.getItem('accessToken') }),
 });

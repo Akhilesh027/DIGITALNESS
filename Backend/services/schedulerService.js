@@ -5,14 +5,15 @@ const AuditLog = require("../models/AuditLog");
 const createNotification = require("../utils/createNotification");
 const { getQueue } = require("../queues/queueRegistry");
 
-exports.scheduleContentPublish = async ({ contentItemId, scheduledFor, user, timezone = "Asia/Kolkata" }) => {
-  const contentItem = await ContentItem.findById(contentItemId);
+exports.scheduleContentPublish = async ({ contentItemId, scheduledFor, user, timezone = "Asia/Kolkata", requireApproved = false, expectedUpdatedAt }) => {
+  let contentItem = await ContentItem.findById(contentItemId);
 
   if (!contentItem) {
     throw new Error("Content item not found");
   }
 
-  // Auto-approve content item for scheduling if pending
+  if (requireApproved && contentItem.approvalStatus !== 'Approved') throw new Error('An approver must approve this content before scheduling');
+  // Legacy admin scheduling can approve; delegated publishing cannot.
   if (contentItem.approvalStatus !== "Approved") {
     contentItem.approvalStatus = "Approved";
     await contentItem.save();
@@ -20,7 +21,10 @@ exports.scheduleContentPublish = async ({ contentItemId, scheduledFor, user, tim
 
   // Auto-approve attached creative project if present
   if (contentItem.creativeProjectId) {
-    await CreativeProject.findByIdAndUpdate(contentItem.creativeProjectId, { approvalStatus: "Approved" });
+    if (requireApproved) {
+      const creative = await CreativeProject.findById(contentItem.creativeProjectId).select('approvalStatus customerId');
+      if (!creative || String(creative.customerId) !== String(contentItem.customerId) || creative.approvalStatus !== 'Approved') throw new Error('The attached creative must be approved for this client');
+    } else await CreativeProject.findByIdAndUpdate(contentItem.creativeProjectId, { approvalStatus: 'Approved' });
   }
 
   const scheduledDate = new Date(scheduledFor);
@@ -33,6 +37,10 @@ exports.scheduleContentPublish = async ({ contentItemId, scheduledFor, user, tim
     throw new Error("Scheduled time must be in the future");
   }
 
+  if (requireApproved) {
+    contentItem = await ContentItem.findOneAndUpdate({ _id: contentItemId, status: 'Approved', approvalStatus: 'Approved', updatedAt: new Date(expectedUpdatedAt) }, { $set: { status: 'Scheduled', scheduledFor: scheduledDate } }, { returnDocument: 'after' });
+    if (!contentItem) throw new Error('Content changed or was already scheduled. Refresh before publishing');
+  }
   // Check for existing scheduled job for this content item
   let scheduledJob = await ScheduledJob.findOne({
     entityId: contentItemId,
@@ -66,7 +74,7 @@ exports.scheduleContentPublish = async ({ contentItemId, scheduledFor, user, tim
     scheduledJob.status = initialStatus;
     scheduledJob.bullJobId = bullJobId;
     scheduledJob.failureReason = failureReason;
-    scheduledJob.approvedBy = user?._id;
+    scheduledJob.approvedBy = requireApproved ? contentItem.approvedBy : user?._id;
     await scheduledJob.save();
   } else {
     scheduledJob = await ScheduledJob.create({
@@ -91,7 +99,7 @@ exports.scheduleContentPublish = async ({ contentItemId, scheduledFor, user, tim
       status: initialStatus,
       failureReason,
       createdBy: user?._id,
-      approvedBy: user?._id,
+      approvedBy: requireApproved ? contentItem.approvedBy : user?._id,
     });
   }
 

@@ -8,6 +8,24 @@ const router = express.Router();
 const creativePipelineService = require("../ai/creative/CreativePipelineService");
 const CreativeAsset = require("../models/CreativeAsset");
 const { protect } = require("../middleware/authMiddleware");
+const openAIStudio = require('../ai/creative/OpenAIStudioService');
+const openAIProvider = require('../ai/providers/OpenAIStudioProvider');
+
+router.get('/openai/status', protect, (req, res) => {
+  try { openAIStudio.customerFilter(req.user); res.json({ success: true, data: { ...openAIProvider.config(), verified: false } }); }
+  catch (error) { res.status(error.statusCode || 500).json({ success: false, message: error.message }); }
+});
+router.post('/openai/prompt', protect, async (req, res) => {
+  try { const data = await openAIStudio.synthesize({ ...req.body, user: req.user }); res.json({ success: true, data }); }
+  catch (error) { res.status(error.statusCode || 500).json({ success: false, message: error.statusCode ? error.message : 'Could not save the OpenAI brief.' }); }
+});
+router.post('/openai/generate', protect, async (req, res) => {
+  try {
+    const baseUrl = process.env.PUBLIC_API_URL || `${req.protocol}://${req.get('host')}`;
+    const data = await openAIStudio.generate({ customerId: req.body.customerId, draftId: req.body.draftId, prompt: req.body.customPrompt, user: req.user, baseUrl });
+    res.json({ success: true, data });
+  } catch (error) { res.status(error.statusCode || 500).json({ success: false, message: error.statusCode ? error.message : 'OpenAI image generation failed.' }); }
+});
 
 /**
  * POST /api/creatives/synthesize-prompt

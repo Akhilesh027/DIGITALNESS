@@ -5,6 +5,7 @@ const {
   getCustomerDashboardReport,
   getCustomerProjectsReport,
   getCustomerDailyReport,
+  getCustomerWeeklyReport,
   getCustomerMonthlyReport,
   getCustomerEmployeeReport,
   getCustomerPaymentReport,
@@ -18,6 +19,7 @@ router.use(protect);
 router.get("/customer/:customerId/dashboard", getCustomerDashboardReport);
 router.get("/customer/:customerId/projects", getCustomerProjectsReport);
 router.get("/customer/:customerId/daily", getCustomerDailyReport);
+router.get("/customer/:customerId/weekly", getCustomerWeeklyReport);
 router.get("/customer/:customerId/monthly", getCustomerMonthlyReport);
 router.get("/customer/:customerId/employees", getCustomerEmployeeReport);
 router.get("/customer/:customerId/payments", getCustomerPaymentReport);

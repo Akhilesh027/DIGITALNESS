@@ -1312,8 +1312,6 @@ exports.rechargeCustomerPlan = async (req, res) => {
   try {
     const {
       planName,
-      days = 30,
-      months = 0,
       validUntil,
       monthlyAmount,
       servicesIncluded,
@@ -1333,37 +1331,42 @@ exports.rechargeCustomerPlan = async (req, res) => {
 
     if (planName) customer.rechargePlan.planName = planName;
     if (billingFrequency) customer.rechargePlan.billingFrequency = billingFrequency;
-    if (monthlyAmount !== undefined) customer.rechargePlan.monthlyAmount = Number(monthlyAmount);
+    if (monthlyAmount !== undefined) customer.rechargePlan.monthlyAmount = monthlyAmount === null || monthlyAmount === '' ? null : Number(monthlyAmount);
     if (Array.isArray(servicesIncluded)) customer.rechargePlan.servicesIncluded = servicesIncluded;
 
+    if (monthlyAmount !== undefined && monthlyAmount !== null && monthlyAmount !== '' && (!Number.isFinite(Number(monthlyAmount)) || Number(monthlyAmount) < 0)) {
+      return res.status(400).json({ success: false, message: "Retainer amount must be a non-negative number" });
+    }
     // Calculate new expiry date
     let newExpiry;
     if (validUntil) {
-      newExpiry = new Date(validUntil);
+      try { newExpiry = new Date(`${require('../services/renewalPolicy').expiryDay(validUntil)}T00:00:00Z`); }
+      catch (error) { return res.status(400).json({ success: false, message: error.message }); }
     } else {
-      const currentExpiry = customer.rechargePlan.validUntil && new Date(customer.rechargePlan.validUntil) > new Date()
-        ? new Date(customer.rechargePlan.validUntil)
-        : new Date();
-
-      if (months > 0) {
-        currentExpiry.setMonth(currentExpiry.getMonth() + Number(months));
-      } else {
-        currentExpiry.setDate(currentExpiry.getDate() + Number(days));
-      }
-      newExpiry = currentExpiry;
+      return res.status(400).json({ success: false, message: 'Service End Date is required' });
     }
 
     customer.rechargePlan.validFrom = new Date();
     customer.rechargePlan.validUntil = newExpiry;
 
-    // Auto-unlock if previously held
-    if (autoUnlock && customer.accessControl?.isPortalLocked) {
-      customer.accessControl.isPortalLocked = false;
-      customer.accessControl.servicesSuspended = false;
-      customer.accessControl.holdType = "NONE";
-    }
-
+    customer.rechargePlan.gracePeriodDays = 3;
+    customer.rechargePlan.autoHoldOnExpiry = true;
+    customer.rechargePlan.renewalRevision = (customer.rechargePlan.renewalRevision || 0) + 1;
     await customer.save();
+    const policy = require('../services/renewalPolicy');
+    if (autoUnlock && !policy.expiryDue(customer)) {
+      const restored = await Customer.findOneAndUpdate({ _id: customer._id, 'rechargePlan.validUntil': newExpiry, 'rechargePlan.renewalRevision': customer.rechargePlan.renewalRevision, 'accessControl.isPortalLocked': true, 'accessControl.holdType': 'EXPIRY' }, { $set: {
+        'accessControl.isPortalLocked': false, 'accessControl.holdType': 'NONE',
+        'accessControl.lockReason': '', 'accessControl.lockMessage': '',
+        'accessControl.lockedAt': null, 'accessControl.lockedBy': null,
+        'accessControl.servicesSuspended': false,
+      } }, { returnDocument: 'after' });
+      if (restored) customer.accessControl = restored.accessControl;
+    }
+    const enforced = await require('../services/renewalService').enforce(customer);
+    if (enforced) customer.accessControl = enforced.accessControl;
+    try { await require('../services/renewalService').reconcile(customer); }
+    catch (error) { console.error('[Renewal scheduling will retry]', error.message); }
 
     // Broadcast update via WebSockets
     const io = req.app.get("io");
@@ -1410,6 +1413,7 @@ exports.rechargeCustomerPlan = async (req, res) => {
  */
 exports.getCustomerRechargeStatus = async (req, res) => {
   try {
+    if (req.user?.role === 'Client' && String(req.user.customerId) !== String(req.params.id)) return res.status(403).json({ success: false, message: 'Access denied' });
     const customer = await Customer.findById(req.params.id)
       .select("name companyName rechargePlan accessControl totalPending totalPaid email phone contactNumbers")
       .lean();
@@ -1419,11 +1423,13 @@ exports.getCustomerRechargeStatus = async (req, res) => {
     }
 
     const validUntil = customer.rechargePlan?.validUntil ? new Date(customer.rechargePlan.validUntil) : null;
+    const cutoffAt = validUntil ? require('../services/renewalPolicy').cutoffFor(validUntil) : null;
     let daysRemaining = null;
     let isExpired = false;
 
     if (validUntil) {
-      const diffMs = validUntil.getTime() - Date.now();
+      const expiryEnd = cutoffAt.getTime() - 3 * 86400000;
+      const diffMs = expiryEnd - Date.now();
       daysRemaining = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
       isExpired = daysRemaining <= 0;
     }
@@ -1440,6 +1446,9 @@ exports.getCustomerRechargeStatus = async (req, res) => {
           ...customer.rechargePlan,
           daysRemaining,
           isExpired,
+          cutoffAt,
+          gracePeriodDays: 3,
+          inGracePeriod: isExpired && Date.now() < cutoffAt.getTime(),
         },
         accessControl: customer.accessControl || {
           isPortalLocked: false,
@@ -1460,51 +1469,12 @@ exports.getCustomerRechargeStatus = async (req, res) => {
  */
 exports.sendRechargeDueAlert = async (req, res) => {
   try {
-    const { channel = "WhatsApp", customMessage = "" } = req.body;
     const customer = await Customer.findById(req.params.id);
-    if (!customer) {
-      return res.status(404).json({ success: false, message: "Customer not found." });
-    }
-
-    const pending = Number(customer.totalPending || 0);
-    const validUntilStr = customer.rechargePlan?.validUntil
-      ? new Date(customer.rechargePlan.validUntil).toLocaleDateString("en-IN")
-      : "today";
-
-    const defaultMsg = `Dear ${customer.name},\n\nThis is a priority reminder from Digitalness. Your agency service retainer validity expires on ${validUntilStr}.${pending > 0 ? ` Outstanding balance due: ₹${pending.toLocaleString("en-IN")}.` : ""}\n\nPlease complete your recharge promptly to ensure uninterrupted marketing campaigns, creatives, and client portal access.\n\nThank you,\nFinance & Operations`;
-
-    const messageContent = (customMessage && customMessage.trim()) || defaultMsg;
-
-    const Communication = require("../models/Communication");
-    const alertRecord = await Communication.create({
-      customerId: customer._id,
-      recipientType: "Customer",
-      recipientId: customer._id,
-      recipientName: customer.name,
-      channel,
-      direction: "Outbound",
-      status: "Sent",
-      subject: `Service Retainer & Payment Alert: ${customer.name}`,
-      message: messageContent,
-      content: messageContent,
-      by: req.user?._id || null,
-      byName: req.user?.name || "Finance Admin",
-      metadata: {
-        autoTriggered: false,
-        trigger: "RECHARGE_RENEWAL_ALERT",
-        totalPending: pending,
-        validUntil: customer.rechargePlan?.validUntil || null,
-        recipientPhone: customer.contactNumbers?.[0] || customer.phone || "",
-      },
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: `Recharge alert sent via ${channel} to ${customer.name}.`,
-      data: alertRecord,
-    });
-  } catch (error) {
-    console.error("[Send Recharge Alert Error]:", error);
-    return res.status(500).json({ success: false, message: error.message });
-  }
+    if (!customer?.rechargePlan?.validUntil) return res.status(400).json({ success: false, message: "Save a Service End Date before sending a renewal reminder" });
+    const { channel = 'WhatsApp', customMessage } = req.body;
+    if (!['WhatsApp', 'Email'].includes(channel) || customMessage?.trim()) return res.status(400).json({ success: false, message: 'Renewal reminders use the approved template. Choose WhatsApp or Email without custom text.' });
+    const providerId = await require('../services/renewalDelivery').deliver(customer, { channel });
+    const record = await require('../models/Communication').create({ customerId: customer._id, channel, direction: 'Outbound', status: 'Sent', subject: 'Service renewal reminder', message: `Renewal reminder for ${require('../services/renewalPolicy').expiryDay(customer.rechargePlan.validUntil)}`, by: req.user._id, metadata: { providerId } });
+    res.json({ success: true, message: 'Reminder accepted by provider', data: record });
+  } catch (error) { res.status(502).json({ success: false, message: error.message }); }
 };

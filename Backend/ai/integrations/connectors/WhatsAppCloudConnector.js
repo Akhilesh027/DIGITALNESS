@@ -176,6 +176,7 @@ class WhatsAppCloudConnector {
           Authorization: `Bearer ${credentialContext.accessToken}`,
           "Content-Type": "application/json",
         },
+        signal: AbortSignal.timeout(20000),
         body: JSON.stringify(payload),
       });
       const data = await response.json();

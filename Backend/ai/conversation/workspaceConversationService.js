@@ -472,9 +472,13 @@ class WorkspaceConversationService {
    * Retrieves or initializes an active AI Conversation.
    */
   async getOrCreateConversation({ conversationId, userId }) {
+    if (!userId) throw Object.assign(new Error("Staff account required."), { statusCode: 403 });
     let conv = null;
     if (conversationId) {
       conv = await AIConversation.findOne({ conversationId });
+      if (conv && String(conv.userId) !== String(userId)) {
+        throw Object.assign(new Error("Conversation not found."), { statusCode: 404 });
+      }
     }
     if (!conv) {
       const newId = conversationId || `conv_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
@@ -529,7 +533,7 @@ class WorkspaceConversationService {
       let pendingSession = null;
       if (input.pendingCommandId || conversation.pendingCommandId) {
         const sessionId = input.pendingCommandId || conversation.pendingCommandId;
-        pendingSession = await AICommandSession.findOne({ sessionId });
+        pendingSession = await AICommandSession.findOne({ sessionId, conversationId: conversation.conversationId });
       }
 
       // Record User Message into conversation if input is text
@@ -2868,6 +2872,7 @@ class WorkspaceConversationService {
         });
       } catch (dbErr) {
         console.warn("[_handleApproval] Error creating CRM content/scheduler items:", dbErr.message);
+        throw new Error("The creative could not be saved to the content calendar and scheduler. Scheduling is not confirmed.");
       }
 
       // Create AgentRun record with correct schema fields
@@ -3170,34 +3175,13 @@ class WorkspaceConversationService {
    * Internal Handler for Creative Revisions.
    */
   async _handleRevision({ conversation, session, instruction, creativeRunId, userId, turnId }) {
-    const run = await AgentRun.findById(creativeRunId || session?.creativeRunId);
+    const run = await AgentRun.findOne({ _id: creativeRunId || session?.creativeRunId, requestedBy: userId });
     if (!run) {
       throw new Error("Target creative run not found for revision.");
     }
 
-    // Update creative run with revised version
-    run.status = "Completed";
-    run.output.copy.headline = `[Revised] ${run.output.copy.headline}`;
-    run.output.copy.caption = `${run.output.copy.caption}\n\n*Note: Updated with ${instruction}*`;
-    await run.save();
-
-    return responseBuilder.buildCompletedResponse({
-      conversationId: conversation.conversationId,
-      turnId,
-      command: "creative.revise",
-      intent: "CREATIVE_REVISE",
-      customerId: run.customerId,
-      customerName: conversation.activeCustomerName,
-      result: run,
-      asset: {
-        runId: run._id,
-        version: 2,
-        imageUrl: run.output.imageUrl,
-        headline: run.output.copy.headline,
-        caption: run.output.copy.caption,
-        hashtags: run.output.copy.hashtags,
-      },
-    });
+    // No image editor is connected to this handler. Preserve the approved asset.
+    throw new Error("Image revision is not connected in this workspace yet. The original creative has not been changed. Use the Creative Studio revision workflow.");
   }
 
   /**
