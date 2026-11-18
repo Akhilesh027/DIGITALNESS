@@ -3,6 +3,7 @@ const Work = require("../models/Work");
 const Notification = require("../models/Notification");
 const User = require("../models/User");
 const Customer = require("../models/Customer");
+const policy = require('../services/servicePermissions');
 
 const ADMIN_ROLES = ["Admin", "admin"];
 const MANAGER_ROLES = ["Operational Manager", "Branch Manager"];
@@ -97,10 +98,10 @@ const populateUpdateQuery = (query) => {
 };
 
 const getRoleFilter = async (user) => {
-  if (ADMIN_ROLES.includes(user?.role)) return {};
-
-  if (MANAGER_ROLES.includes(user?.role)) {
-    return { branchId: user.branchId };
+  const scope = policy.scope(user);
+  if (scope.kind === 'company') return {};
+  if (scope.kind === 'branch') {
+    return { branchId: scope.branchId };
   }
 
   return { employee: getUserId(user) };
@@ -517,6 +518,8 @@ exports.getDailyUpdateStats = async (req, res) => {
 
 exports.reviewDailyUpdate = async (req, res) => {
   try {
+    const scope = policy.scope(req.user);
+    if (!['company', 'branch'].includes(scope.kind)) return res.status(403).json({ success: false, message: 'Review access required' });
     const { approvalStatus, managerComment, revisionReason } = req.body;
 
     const allowedStatuses = ["Pending", "Approved", "Changes Requested"];
@@ -529,7 +532,7 @@ exports.reviewDailyUpdate = async (req, res) => {
     }
 
     const update = await populateUpdateQuery(
-      DailyUpdate.findById(req.params.id)
+      DailyUpdate.findOne({ _id: req.params.id, ...(scope.kind === 'branch' ? { branchId: scope.branchId } : {}) })
     );
 
     if (!update) {

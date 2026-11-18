@@ -8,7 +8,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import EmployeesPage from "./pages/EmployeesPage";
-import MyServicesPage from './pages/MyServicesPage';
+import EmployeeWorkspacePage from './pages/EmployeeWorkspacePage';
 import LeadsPage from "./pages/LeadsPage";
 import CustomersPage from "./pages/CustomersPage";
 import WorksPage from "./pages/WorksPage";
@@ -38,7 +38,8 @@ import EmployeeDailyUpdate from "./pages/EmployeeDailyUpdate";
 import BlogsPage from "./pages/BlogsPage";
 import CertificatesPage from "./pages/CertificatesPage";
 import AdminDailyUpdates from "./pages/AdminDailyUpdates";
-import AttendancePage from "./pages/AttendancePage";
+import DailyUpdatesPage from './pages/DailyUpdatesPage';
+import AttendancePage from "./pages/AttendanceManagementPage";
 import RecruitmentPage from "./pages/RecruitmentPage";
 import AuditLogsPage from "./pages/AuditLogsPage";
 import ContentCalendarPage from "./pages/ContentCalendarPage";
@@ -142,7 +143,7 @@ const App = () => (
               }
             >
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/my-services" element={<MyServicesPage />} />
+              <Route path="/my-services" element={<EmployeeWorkspacePage />} />
               <Route path="/employees" element={<EmployeesPage />} />
               <Route path="/leads" element={<LeadsPage />} />
               <Route path="/customers" element={<CustomersPage />} />
@@ -162,13 +163,14 @@ const App = () => (
               <Route path="/attendance" element={<AttendancePage />} />
 
               <Route path="/daily-update" element={<EmployeeDailyUpdate />} />
+              <Route path="/daily-updates" element={<DailyUpdatesPage />} />
               <Route
                 path="/admin/daily-updates"
-                element={<AdminDailyUpdates />}
+                element={<Navigate to="/daily-updates" replace />}
               />
               <Route
                 path="/daily-updates-review"
-                element={<AdminDailyUpdates />}
+                element={<Navigate to="/daily-updates" replace />}
               />
               <Route path="/blogs-page" element={<BlogsPage />} />
               <Route path="/certificates" element={<CertificatesPage />} />

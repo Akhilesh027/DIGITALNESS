@@ -18,7 +18,7 @@ const notificationSchema = new mongoose.Schema(
 
     moduleModel: {
       type: String,
-      enum: ["Lead", "Deal", "Work", "Proposal", "Customer"],
+      enum: ["Lead", "Deal", "Work", "Proposal", "Customer", "DailyUpdate"],
       required: true,
     },
 

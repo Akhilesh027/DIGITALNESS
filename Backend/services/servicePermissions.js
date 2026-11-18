@@ -33,6 +33,11 @@ function employeeBoundary(req, res, next) {
   const method = req.method;
   const own = id(req.user);
   const allowed = path === '/api/service-access/me'
+    || (method === 'GET' && ['/api/attendance/clock', '/api/attendance/history', '/api/attendance/corrections'].includes(path))
+    || (method === 'POST' && ['/api/attendance/check-in', '/api/attendance/check-out', '/api/attendance/break-start', '/api/attendance/break-end', '/api/attendance/corrections'].includes(path))
+    || (method === 'POST' && /^\/api\/attendance\/corrections\/[a-f\d]{24}\/withdraw$/i.test(path))
+    || (method === 'GET' && path === '/api/notifications')
+    || (method === 'PATCH' && /^\/api\/notifications\/([a-f\d]{24}\/read|read-all)$/i.test(path))
     || path.startsWith('/api/service-workspace/') || path === '/api/service-workspace'
     || (method === 'POST' && ['/api/auth/logout', '/api/users/logout'].includes(path))
     || (method === 'GET' && ['/api/auth', '/api/users', '/api/attendance/my'].includes(path))

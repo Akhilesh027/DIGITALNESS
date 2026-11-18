@@ -3,6 +3,14 @@ const Work = require("../models/Work");
 const User = require("../models/User");
 const Customer = require("../models/Customer");
 const createNotification = require("../utils/createNotification");
+const workspacePolicy = require('../services/servicePermissions');
+
+const canAccessApproval = async (user, approval) => {
+  const scope = workspacePolicy.scope(user);
+  if (scope.kind === 'company') return true;
+  if (scope.kind === 'branch') return Boolean(approval.customer && await Customer.findOne({ _id: workspacePolicy.id(approval.customer), branchId: scope.branchId }).select('_id').lean());
+  return workspacePolicy.id(approval.submittedBy) === workspacePolicy.id(user);
+};
 
 const ADMIN_ROLES = ["Admin", "admin", "Super Admin", "superadmin", "Owner", "owner"];
 const MANAGER_ROLES = ["Operational Manager", "Branch Manager", "Manager", "manager", "operations manager", "operational manager"];
@@ -249,6 +257,7 @@ exports.getApprovals = async (req, res) => {
     if (status && allowedApprovalStatuses.includes(status)) {
       filter.status = status;
     }
+    if (req.query.approvalType === 'Work') filter.work = { $ne: null };
 
     if (ADMIN_ROLES.includes(req.user.role)) {
       filter = { ...filter };
@@ -336,6 +345,8 @@ exports.reviewApproval = async (req, res) => {
         message: "Approval not found",
       });
     }
+
+    if (!(await canAccessApproval(req.user, approval))) return res.status(403).json({ success: false, message: 'This submission is outside your branch' });
 
     if (approval.status !== "Pending Approval") {
       return res.status(400).json({

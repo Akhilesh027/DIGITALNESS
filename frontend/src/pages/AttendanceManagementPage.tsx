@@ -1,0 +1,65 @@
+import { useEffect, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Coffee, Users, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { serviceRequest } from '@/lib/serviceAccess';
+import { AttendanceCorrection, ClockRecord, attendanceDay, attendanceTime, hoursLabel } from '@/lib/attendance';
+import EmployeeAttendance from '@/components/EmployeeAttendance';
+
+type Staff = { _id: string; name: string; role?: string; branchId?: string };
+type Monitor = { employees: Staff[]; items: ClockRecord[]; open: ClockRecord[]; corrections: AttendanceCorrection[]; correctionHistory: AttendanceCorrection[] };
+const employeeId = (row: ClockRecord) => typeof row.employee === 'string' ? row.employee : row.employee?._id;
+export default function AttendanceManagementPage() {
+  const [date, setDate] = useState(attendanceDay());
+  const [tab, setTab] = useState('Team attendance');
+  const [data, setData] = useState<Monitor>({ employees: [], items: [], open: [], corrections: [], correctionHistory: [] });
+  const [requestView, setRequestView] = useState('Awaiting review');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [reload, setReload] = useState(0);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('All');
+  const [selected, setSelected] = useState<AttendanceCorrection | null>(null);
+  const [audit, setAudit] = useState<ClockRecord | null>(null);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const timer = window.setInterval(() => setReload(value => value + 1), 60000);
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    let valid = true; setLoading(true); setError('');
+    serviceRequest(`/attendance/manage?date=${date}`).then(result => { if (valid) setData(result); })
+      .catch(error => { if (valid) setError(error.message); }).finally(() => { if (valid) setLoading(false); });
+    return () => { valid = false; };
+  }, [reload, date]);
+  async function review(status: string) {
+    if (!selected) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      await serviceRequest(`/attendance/manage/corrections/${selected._id}/review`, { method: 'POST', body: JSON.stringify({ status, reviewNote: note }) });
+      setSelected(null); setNote(''); setNotice(`Correction ${status.toLowerCase()}.`); setReload(value => value + 1);
+    } catch (error) { setError(error instanceof Error ? error.message : 'Unable to review request'); }
+    finally { setBusy(false); }
+  }
+  const rows = data.employees.map(employee => ({ employee, record: data.items.find(row => employeeId(row) === employee._id) }));
+  const state = (row: typeof rows[number]) => row.record?.clockState || 'Not checked in';
+  const visible = rows.filter(row => `${row.employee.name} ${row.employee.role || ''} ${row.employee.branchId || ''}`.toLowerCase().includes(search.toLowerCase()) && (filter === 'All' || state(row) === filter));
+  const oldOpen = data.open.filter(row => row.dayKey !== attendanceDay() || row.clockState === 'Missed checkout');
+  const correctionRows = requestView === 'Awaiting review' ? data.corrections : data.correctionHistory || [];
+  return <div className="mx-auto max-w-7xl space-y-6"><div className="flex flex-wrap items-center justify-between gap-4"><div><h1 className="text-2xl font-bold">Attendance management</h1><p className="mt-2 text-sm text-muted-foreground">Monitor work sessions, breaks and correction requests. Times are in IST.</p></div><Button variant="outline" disabled={loading || busy} onClick={() => setReload(value => value + 1)}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button></div><div className="flex flex-wrap gap-2">{['Team attendance', 'Correction requests', 'My attendance'].map(value => <Button key={value} variant={tab === value ? 'default' : 'outline'} onClick={() => setTab(value)}>{value}{value === 'Correction requests' && ` (${data.corrections.length})`}</Button>)}</div>
+    {error && !selected && <p role="alert" className="rounded-xl border border-destructive/30 p-3 text-sm text-destructive">{error}</p>}{notice && <p role="status" className="text-sm text-emerald-600">{notice}</p>}
+    {tab === 'My attendance' ? <EmployeeAttendance /> : tab === 'Team attendance' ? <>
+      <div className="flex flex-wrap gap-3"><label className="text-sm">Attendance date<Input type="date" value={date} onChange={event => { if (event.target.value) setDate(event.target.value); }} /></label><label className="min-w-0 flex-1 text-sm">Find employee<Input placeholder="Name, role or branch" value={search} onChange={event => setSearch(event.target.value)} /></label><label className="text-sm">State<select className="block h-10 rounded-md border bg-background px-3 text-sm" value={filter} onChange={event => setFilter(event.target.value)}>{['All', 'Working', 'On break', 'Checked out', 'Not checked in', 'Missed checkout', 'Legacy record'].map(value => <option key={value}>{value}</option>)}</select></label></div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">{[{ label: 'Working', Icon: Users }, { label: 'On break', Icon: Coffee }, { label: 'Checked out', Icon: CheckCircle2 }, { label: 'Not checked in', Icon: AlertTriangle }, { label: 'Legacy record', Icon: Users }].map(({ label, Icon }) => <button key={label} className="flex items-center justify-between rounded-2xl border bg-card p-5 text-left" onClick={() => setFilter(label)}><div><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-3xl font-semibold">{loading ? '—' : rows.filter(row => state(row) === label).length}</p></div><Icon className="h-6 w-6 text-primary" /></button>)}</div>
+      <p className="text-xs text-muted-foreground">No record means “not checked in”; absence, late arrival and leave rules need shift/leave configuration. Older login-based records are labelled Legacy.</p>
+      {oldOpen.length > 0 && <div className="space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"><h2 className="font-semibold">Open sessions to review</h2><p className="text-xs text-muted-foreground">Overnight sessions stay on their check-in date. Sessions open for over 18 hours are flagged for missed checkout.</p>{oldOpen.map(row => <p key={row._id} className="text-sm">{typeof row.employee === 'object' ? row.employee.name : 'Employee'} · {row.dayKey} · {row.clockState} · Check-in {attendanceTime(row.loginTime)}</p>)}</div>}
+      <div className="overflow-x-auto rounded-xl border bg-card"><table className="w-full text-left text-sm"><thead className="bg-muted/40"><tr>{['Employee', 'State', 'Check in', 'Check out', 'Breaks', 'Net hours', ''].map((label, index) => <th key={index} className="whitespace-nowrap p-3 font-medium">{label}</th>)}</tr></thead><tbody>{visible.map(({ employee, record }) => <tr key={employee._id} className="border-t"><td className="p-3"><p className="font-medium">{employee.name}</p><p className="mt-1 text-xs text-muted-foreground">{employee.role} · {employee.branchId || 'No branch'}</p></td><td className="whitespace-nowrap p-3">{record?.clockState || 'Not checked in'}</td><td className="whitespace-nowrap p-3">{attendanceTime(record?.loginTime)}</td><td className="whitespace-nowrap p-3">{attendanceTime(record?.logoutTime)}</td><td className="p-3">{Math.round(record?.breakMinutes || 0)}m</td><td className="whitespace-nowrap p-3">{hoursLabel(record?.totalHours)}</td><td className="p-3">{record && <Button size="sm" variant="ghost" onClick={() => setAudit(record)}>Audit</Button>}</td></tr>)}</tbody></table>{!visible.length && <p className="p-6 text-sm text-muted-foreground">{loading ? 'Loading attendance…' : 'No employees match these filters.'}</p>}</div>
+    </> : <div className="space-y-3"><h2 className="font-semibold">Correction requests</h2><div className="flex gap-2">{['Awaiting review', 'Reviewed'].map(value => <Button key={value} size="sm" variant={requestView === value ? 'default' : 'outline'} onClick={() => setRequestView(value)}>{value}</Button>)}</div>{!correctionRows.length && <p className="rounded-xl border bg-card p-6 text-sm text-muted-foreground">{loading ? 'Loading requests…' : 'No correction requests in this view.'}</p>}{correctionRows.map(request => <button key={request._id} className="block w-full space-y-2 rounded-xl border bg-card p-5 text-left hover:border-primary/40" onClick={() => { setSelected(request); setNote(request.status === 'Processing' ? request.reviewNote || '' : ''); setError(''); }}><p className="font-semibold">{typeof request.employee === 'object' ? request.employee.name : 'Employee'} · {request.dayKey}</p><p className="text-sm text-muted-foreground">{attendanceTime(request.proposedIn)} → {attendanceTime(request.proposedOut)} · {request.breakMinutes}m break · {request.status}</p><p className="line-clamp-2 text-sm">{request.reason}</p><p className="text-sm font-medium text-primary">Review correction →</p></button>)}</div>}
+    <Dialog open={Boolean(selected)} onOpenChange={open => { if (!open && !busy) setSelected(null); }}><DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto"><DialogHeader><DialogTitle>Review attendance correction</DialogTitle></DialogHeader>{selected && <div className="space-y-4">{error && <p role="alert" className="text-sm text-destructive">{error}</p>}<p className="font-medium">{typeof selected.employee === 'object' ? selected.employee.name : 'Employee'} · {selected.dayKey}</p><div className="grid gap-4 rounded-xl bg-muted/40 p-4 sm:grid-cols-2"><div><h3 className="text-sm font-semibold">Recorded times</h3><p className="mt-2 text-sm">In: {attendanceTime(selected.before?.loginTime)}</p><p className="mt-1 text-sm">Out: {attendanceTime(selected.before?.logoutTime)}</p><p className="mt-1 text-xs text-muted-foreground">{selected.before ? `${hoursLabel(selected.before.totalHours)} net recorded` : 'Missing attendance record'}</p></div><div><h3 className="text-sm font-semibold">Requested times</h3><p className="mt-2 text-sm">In: {attendanceTime(selected.proposedIn)}</p><p className="mt-1 text-sm">Out: {attendanceTime(selected.proposedOut)}</p><p className="mt-1 text-xs text-muted-foreground">{selected.breakMinutes}m total break</p></div></div><p className="whitespace-pre-wrap text-sm">Reason: {selected.reason}</p>{selected.status === 'Processing' && <p className="text-sm text-amber-700">Approval was started. The approving manager can retry to finish recording it.</p>}{!['Pending', 'Processing'].includes(selected.status) ? <p className="rounded-lg bg-secondary p-3 text-sm">{selected.status} · {selected.reviewNote || 'No review note'}</p> : <><label className="block text-sm">Review note<Textarea required value={note} disabled={busy} maxLength={2000} onChange={event => setNote(event.target.value)} /></label><p className="text-xs text-muted-foreground">Approval updates attendance and retains the before/after audit. Employees cannot approve their own requests.</p><div className="flex gap-2"><Button disabled={busy || !note.trim()} onClick={() => review('Approved')}>{selected.status === 'Processing' ? 'Finish approval' : 'Approve correction'}</Button><Button variant="outline" disabled={busy || !note.trim() || selected.status !== 'Pending'} onClick={() => review('Rejected')}>Reject</Button></div></>}</div>}</DialogContent></Dialog>
+    <Dialog open={Boolean(audit)} onOpenChange={open => { if (!open) setAudit(null); }}><DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto"><DialogHeader><DialogTitle>Attendance audit · {audit?.dayKey}</DialogTitle></DialogHeader>{audit?.legacySnapshot && <p className="rounded-lg bg-secondary p-3 text-sm">Original automatic record retained: {attendanceTime(audit.legacySnapshot.loginTime as string)} → {attendanceTime(audit.legacySnapshot.logoutTime as string)}</p>}{!audit?.events?.length && <p className="text-sm text-muted-foreground">Older login-based record. No manual attendance events.</p>}{audit?.events?.map((entry, index) => <article key={index} className="space-y-2 rounded-lg border p-3"><p className="text-sm font-semibold">{entry.action.replace(/_/g, ' ')} · {attendanceTime(entry.at)}</p>{entry.actor && <p className="text-xs text-muted-foreground">By {typeof entry.actor === 'object' ? entry.actor.name : entry.actor}</p>}{entry.reason && <p className="whitespace-pre-wrap text-sm">{entry.reason}</p>}{entry.before && <p className="text-xs text-muted-foreground">Before: {attendanceTime(entry.before.loginTime)} → {attendanceTime(entry.before.logoutTime)}</p>}{entry.after && <p className="text-xs text-muted-foreground">After: {attendanceTime(entry.after.loginTime)} → {attendanceTime(entry.after.logoutTime)}</p>}</article>)}</DialogContent></Dialog>
+  </div>;
+}

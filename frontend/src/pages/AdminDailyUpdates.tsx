@@ -45,6 +45,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useServiceAccess } from '@/lib/serviceAccess';
 
 const API_URL = import.meta.env.VITE_API_URL || "https://server.digitalness.co.in/api";
 const SERVER_URL = API_URL.replace("/api", "");
@@ -209,19 +210,16 @@ const getClientName = (update: DailyUpdate) =>
   update.customer?.companyName ||
   "—";
 
-export default function AdminDailyUpdates() {
+export default function AdminDailyUpdates({ reviewOnly = false }: { reviewOnly?: boolean } = {}) {
   const { toast } = useToast();
+  const { access } = useServiceAccess();
 
   const currentUser = getCurrentUser();
   const currentUserRole = String(currentUser?.role || "")
     .trim()
     .toLowerCase();
 
-  const canReviewUpdates =
-    currentUserRole === "admin" ||
-    currentUserRole === "operational manager" ||
-    currentUserRole === "operationalmanager" ||
-    currentUserRole === "branch manager";
+  const canReviewUpdates = ['company', 'branch'].includes(access?.mode || '');
 
   const [updates, setUpdates] = useState<DailyUpdate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -283,8 +281,8 @@ export default function AdminDailyUpdates() {
 
   useEffect(() => {
     fetchUpdates();
-    fetchWorks();
-  }, []);
+    if (!reviewOnly) fetchWorks();
+  }, [reviewOnly]);
 
   const employees = useMemo(() => {
     const map = new Map<string, { id: string; name: string }>();
@@ -746,12 +744,12 @@ export default function AdminDailyUpdates() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Daily Updates Review
+              Daily Updates
             </h1>
             <p className="text-muted-foreground">
               {canReviewUpdates
@@ -855,7 +853,7 @@ export default function AdminDailyUpdates() {
           </Card>
         </div>
 
-        <Card className="border-0 shadow-sm">
+        {!reviewOnly && <Card className="border-0 shadow-sm">
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle>Submit Daily Work Update</CardTitle>
@@ -1132,7 +1130,7 @@ export default function AdminDailyUpdates() {
               </div>
             </CardContent>
           )}
-        </Card>
+        </Card>}
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">

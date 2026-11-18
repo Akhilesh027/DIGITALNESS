@@ -95,9 +95,7 @@ export default function LoginPage() {
 
       toast({
         title: "Login Successful",
-        description: data.attendance?.loginTime
-          ? `Welcome ${data.user.name}. Attendance marked.`
-          : `Welcome ${data.user.name}`,
+        description: `Welcome ${data.user.name}. Use attendance controls to check in when work begins.`,
       });
 
       const redirectPath = roleRoutes[data.user.role] || "/dashboard";

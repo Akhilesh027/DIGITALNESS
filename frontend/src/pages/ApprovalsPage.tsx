@@ -56,6 +56,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import EmployeeSubmissionQueue from '@/components/EmployeeSubmissionQueue';
 
 import {
   fetchApprovals,
@@ -235,6 +236,8 @@ export default function ApprovalsPage() {
           </Button>
         </div>
       </div>
+
+      <EmployeeSubmissionQueue />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

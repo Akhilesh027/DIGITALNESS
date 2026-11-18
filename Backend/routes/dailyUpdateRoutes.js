@@ -19,6 +19,8 @@ const {
 const { protect } = require("../middleware/authMiddleware");
 const { authorize } = require("../middleware/authRole.js");
 const upload = require("../middleware/uploadMiddleware.js");
+const scope = require('../services/servicePermissions');
+const requireReviewer = (req, res, next) => ['company', 'branch'].includes(scope.scope(req.user).kind) ? next() : res.status(403).json({ success: false, message: 'Only administrators and branch managers can review daily updates' });
 
 router.use(protect);
 
@@ -70,13 +72,13 @@ router.get(
 
 router.get(
   "/",
-  authorize("Admin", "Operational Manager"),
+  requireReviewer,
   getAllUpdates
 );
 
 router.put(
   "/:id/review",
-  authorize("Admin", "Operational Manager"),
+  requireReviewer,
   reviewDailyUpdate
 );
 

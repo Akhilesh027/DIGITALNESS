@@ -6,6 +6,20 @@ const Work = require('../models/Work');
 const AdCampaign = require('../models/AdCampaign');
 const ContentItem = require('../models/ContentItem');
 router.use(protect);
+router.use(require('./employeeWorkspaceRoutes'));
+
+// Direct assignments are independent of client/service grants (including
+// internal tasks and work types such as website development).
+router.get('/my-work', async (req, res, next) => {
+  try {
+    if (!['assigned', 'company', 'branch'].includes(p.scope(req.user).kind)) throw p.error();
+    const rows = await Work.find({ assignedTo: req.user._id })
+      .select('_id title description workType clientName customer status approvalStatus priority dueDate parentWorkId updatedAt blockedBy timeSpent')
+      .populate('customer', 'name companyName').sort({ createdAt: -1 }).lean();
+    const items = rows.map(({ customer, ...item }) => ({ ...item, clientName: item.clientName || customer?.name || customer?.companyName || '' }));
+    res.json({ success: true, items });
+  } catch (error) { next(error); }
+});
 
 async function context(req, action) {
   const { customerId, service } = req.method === 'GET' ? req.query : req.body;
@@ -14,7 +28,7 @@ async function context(req, action) {
   const scope = p.scope(req.user);
   if (scope.kind === 'assigned' && !p.permitted(req.user, customerId, service, action)) throw p.error(`You do not have ${action} access to this client and service`);
   if (!['company', 'branch', 'assigned'].includes(scope.kind)) throw p.error();
-  const client = await Customer.findOne({ _id: customerId, ...(scope.kind === 'branch' ? { branchId: scope.branchId } : {}) }).select('_id name').lean();
+  const client = await Customer.findOne({ _id: customerId, ...(scope.kind === 'branch' ? { branchId: scope.branchId } : {}) }).select('_id name companyName requirements brandProfile businessProfile').lean();
   if (!client) throw p.error('Client not found', 404);
   return { customerId, service, client };
 }

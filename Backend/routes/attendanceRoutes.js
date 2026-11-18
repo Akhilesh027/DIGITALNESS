@@ -12,6 +12,7 @@ const { protect } = require("../middleware/authMiddleware");
 const { authorize } = require("../middleware/authRole");
 
 router.use(protect);
+router.use(require('./manualAttendanceRoutes'));
 
 router.get("/my", getMyAttendance);
 

@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { clearAuth } from '@/api/auth';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { useServiceAccess } from '@/lib/serviceAccess';
 
 interface NavItem {
   label: string;
@@ -296,6 +297,12 @@ const navSections: NavSection[] = [
         roles: ['Admin', 'Operational Manager'],
       },
       {
+        label: 'Daily Updates',
+        path: '/daily-updates',
+        icon: ClipboardList,
+        roles: ['Admin', 'Operational Manager', 'Branch Manager'],
+      },
+      {
         label: 'Recruitment',
         path: '/RecruitmentPage',
         icon: BriefcaseBusiness,
@@ -362,6 +369,7 @@ export function Sidebar() {
 
   const currentUser = getStoredUser();
   const currentRole = currentUser?.role || 'Admin';
+  const { access } = useServiceAccess();
 
   const toggleSection = (title: string) => {
     setCollapsedSections((prev) => ({
@@ -454,7 +462,7 @@ export function Sidebar() {
       <nav className="flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-3 scrollbar-thin">
         {navSections.map((section) => {
           // Filter items based on user role
-          const visibleItems = section.items.filter((item) => item.roles.includes(currentRole));
+          const visibleItems = section.items.filter((item) => ['/AttendancePage', '/daily-updates'].includes(item.path) ? ['company', 'branch'].includes(access?.mode || '') : item.roles.includes(currentRole));
           if (visibleItems.length === 0) return null;
 
           const isSectionOpen = !collapsedSections[section.title];

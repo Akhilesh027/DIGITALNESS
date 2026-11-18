@@ -1,10 +1,6 @@
 const User = require("../models/User.js");
 const jwt = require("jsonwebtoken");
 const sendMail = require("../utils/sendMail");
-const {
-  markClockIn,
-  markClockOut,
-} = require("../services/attendanceService.js");
 
 const ADMIN_ROLES = ["Admin", "admin"];
 const MANAGER_ROLES = ["Operational Manager", "Branch Manager"];
@@ -253,13 +249,6 @@ exports.loginUser = async (req, res) => {
     user.lastLoginAt = new Date();
     await user.save({ validateBeforeSave: false });
 
-    let attendance = null;
-
-    try {
-      attendance = await markClockIn(user, req);
-    } catch (attendanceError) {
-      console.log("Attendance clock-in error:", attendanceError.message);
-    }
 
     res.json({
       message: "Login successful",
@@ -278,7 +267,6 @@ exports.loginUser = async (req, res) => {
         serviceGrants: user.serviceGrants || [],
         accessVersion: user.accessVersion || 0,
       },
-      attendance,
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -290,12 +278,9 @@ exports.loginUser = async (req, res) => {
 
 exports.logoutUser = async (req, res) => {
   try {
-    const attendance = await markClockOut(req.user, req);
-
     res.json({
       success: true,
-      message: "Logout successful. Attendance updated.",
-      attendance,
+      message: "Logout successful. Use attendance controls to check out of work.",
     });
   } catch (error) {
     res.status(500).json({
